@@ -1,0 +1,11 @@
+"use client";
+import {useEffect,useState} from "react";
+import {useRouter} from "next/navigation";
+import {api} from "@/lib/api";
+type Idea={title:string;category:string;premise:string;viral_reason:string;estimated_cost:number};
+export default function NewVideo(){const router=useRouter();const [ideas,setIdeas]=useState<Idea[]>([]),[loading,setLoading]=useState(false),[category,setCategory]=useState(""),[cfg,setCfg]=useState<any>(null),[error,setError]=useState("");
+ useEffect(()=>{api<any>("/api/config/public").then(setCfg).catch(e=>setError(e.message))},[]);
+ async function generate(){setLoading(true);setError("");try{setIdeas(await api<Idea[]>("/api/ideas",{method:"POST",body:JSON.stringify({count:cfg?.content?.idea_count||10,category:category||null})}))}catch(e:any){setError(e.message)}finally{setLoading(false)}}
+ async function choose(i:Idea){const p=await api<any>("/api/projects",{method:"POST",body:JSON.stringify(i)});router.push(`/videos/${p.id}`)}
+ const cats=cfg?.content?.categories||["past","impossible","survival","future","space"];
+ return <><section className="hero"><div className="badge">Create</div><h1 className="mobileHeadline">Find your next <em>POV</em></h1><p>Pick a category or let AI mix them. Choosing an idea does not generate paid video.</p></section>{error&&<div className="notice">{error}</div>}<div className="card"><div className="row mobileStack"><select className="input tap" value={category} onChange={e=>setCategory(e.target.value)}><option value="">All categories</option>{cats.map((x:string)=><option key={x}>{x}</option>)}</select><button className="btn primary tap" onClick={generate} disabled={loading}>{loading?"Generating ideas…":`Generate ${cfg?.content?.idea_count||10} Ideas`}</button></div></div><div className="grid grid-2" style={{marginTop:14}}>{ideas.map((i,n)=><div className="card" key={n}><div className="row space"><span className="badge">{i.category}</span><strong className="cost">est. ${Number(i.estimated_cost||0).toFixed(2)}</strong></div><h3>{i.title}</h3><p>{i.premise}</p><p className="muted"><strong>Why it could work:</strong> {i.viral_reason}</p><button className="btn primary tap" style={{width:"100%"}} onClick={()=>choose(i)}>Use This Idea</button></div>)}</div></>}

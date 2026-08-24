@@ -1,0 +1,36 @@
+"use client";
+import {useEffect,useState} from "react";
+import {useParams} from "next/navigation";
+import {api} from "@/lib/api";
+
+const steps=["idea","research","script","storyboard","video_scenes","voice","render","final","publish","published"];
+export default function ProjectPage(){const params=useParams<{id:string}>();const id=params.id;const [p,setP]=useState<any>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
+ async function refresh(){setP(await api(`/api/projects/${id}`))} useEffect(()=>{refresh().catch(e=>setError(String(e)))},[id]);
+ async function act(path:string,body?:any){setBusy(true);setError("");try{setP(await api(`/api/projects/${id}/${path}`,{method:"POST",body:body?JSON.stringify(body):undefined}))}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ if(!p)return <p>{error||"Loading…"}</p>;
+ const current=steps.indexOf(p.stage); const board=p.storyboard||[];
+ return <><section className="hero"><div className="row"><span className="badge">{p.category}</span><span className="badge amber">{p.status.replaceAll("_"," ")}</span></div><h1 style={{fontSize:"clamp(30px,4vw,48px)"}}>{p.title}</h1><p>{p.premise}</p></section>
+ <div className="stepbar">{steps.map((s,i)=><div key={s} className={`step ${i<current?"done":i===current?"active":""}`}>{i<current?"✓ ":""}{s.replaceAll("_"," ")}</div>)}</div>
+ {error&&<p className="notice">{error}</p>}
+ <div className="grid grid-2" style={{marginTop:16}}><div className="card"><h2>Current approval</h2><Workflow p={p} busy={busy} act={act}/></div><div className="card"><h2>Project controls</h2><p className="muted">Every expensive step stays behind an explicit approval. Provider behavior, cost targets, scene count, prompts and publishing defaults live in config—not this UI.</p><div className="row"><span className="badge green">YouTube only</span><span className="badge">No auto publish</span></div></div></div>
+ {p.script?.segments?.length>0&&<div className="card" style={{marginTop:16}}><h2>Script</h2>{p.script.segments.map((s:any,i:number)=><div className="project" key={i}><div><strong>{s.start}:00–{s.end}:00 · {s.narration}</strong><div className="muted">{s.visual}</div></div></div>)}</div>}
+ {board.length>0&&<div className="card" style={{marginTop:16}}><div className="row space"><h2>Storyboard</h2><span className="muted">{board.filter((x:any)=>x.approved).length}/{board.length} approved</span></div>{board.map((s:any)=><div className="scene" key={s.index}><div className="preview">Scene {s.index+1}</div><div><strong>{s.narration}</strong><p className="muted">{s.prompt}</p><div className="row"><button className="btn primary" disabled={busy||s.approved} onClick={()=>act("scene-decision",{scene_index:s.index,approved:true,notes:""})}>{s.approved?"✓ Approved":"Approve"}</button><button className="btn" disabled={busy} onClick={()=>act("scene-decision",{scene_index:s.index,approved:false,notes:"Needs regeneration"})}>Reject</button></div></div></div>)}</div>}
+ {p.scenes?.length>0&&<div className="card" style={{marginTop:16}}><h2>Generated Video Scenes</h2>{p.scenes.map((s:any)=><div className="project" key={s.index}><div><strong>Scene {s.index+1}</strong><div className="muted">{s.video?.provider} · {s.video?.status} · ${Number(s.video?.cost||0).toFixed(2)}</div></div><span className={`badge ${s.video_approved?"green":"amber"}`}>{s.video_approved?"approved":"needs review"}</span></div>)}</div>}
+ </>}
+
+function Workflow({p,busy,act}:{p:any,busy:boolean,act:(path:string,body?:any)=>void}){
+ if(p.stage==="idea")return <div className="stack"><p>Approve this concept before research or writing begins.</p><button className="btn primary" disabled={busy} onClick={()=>act("approve-idea")}>Approve Idea</button></div>;
+ if(p.stage==="research"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("generate-script")}>Research + Generate Script</button>;
+ if(p.stage==="script")return <div className="stack"><p>Review the full script below. No video generation has happened yet.</p><button className="btn primary" disabled={busy} onClick={()=>act("approve-script")}>Approve Script</button></div>;
+ if(p.stage==="storyboard"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("generate-storyboard")}>Generate Storyboard</button>;
+ if(p.stage==="storyboard")return <p>Approve each storyboard scene below. All scenes must be approved before video generation.</p>;
+ if(p.stage==="video_scenes"&&p.status==="ready_to_generate")return <div className="stack"><div className="notice">This is the first expensive generation step in production mode.</div><button className="btn primary" disabled={busy} onClick={()=>act("generate-video-scenes")}>Generate Video Scenes</button></div>;
+ if(p.stage==="video_scenes")return <button className="btn primary" disabled={busy} onClick={()=>act("approve-video-scenes")}>Approve All Video Scenes</button>;
+ if(p.stage==="voice"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("generate-voice")}>Generate Narration</button>;
+ if(p.stage==="voice")return <button className="btn primary" disabled={busy} onClick={()=>act("approve-voice")}>Approve Narration</button>;
+ if(p.stage==="render"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("render")}>Render Final Short</button>;
+ if(p.stage==="final")return <button className="btn primary" disabled={busy} onClick={()=>act("approve-final")}>Approve Final Video</button>;
+ if(p.stage==="publish")return <div className="stack"><p>Publishing is YouTube-only. Mock mode will not contact YouTube.</p><button className="btn primary" disabled={busy} onClick={()=>act("publish",{})}>Publish to YouTube</button></div>;
+ if(p.stage==="published")return <div><span className="badge green">Published</span><p className="muted">Publishing result: {p.publish?.url||p.publish?.status||"complete"}</p></div>;
+ return <p className="muted">Waiting for the next action.</p>
+}
