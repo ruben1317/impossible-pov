@@ -1,0 +1,131 @@
+app:
+  name: "IMPOSSIBLE POV Content Studio"
+  environment: "development"
+
+channel:
+  name: "IMPOSSIBLE POV"
+  youtube_channel_id: ""
+  tagline: "Different time. Different world. You are there."
+  language: "en-US"
+  disclosure_altered_content: true
+
+video_defaults:
+  aspect_ratio: "9:16"
+  width: 1080
+  height: 1920
+  duration_seconds: 30
+  fps: 30
+  scene_count: 6
+  clip_seconds: 5
+  narrator_style: "cinematic_documentary"
+  caption_style: "bold_centered"
+  music_style: "cinematic_tension"
+
+content:
+  categories: [past, impossible, survival, future, space]
+  idea_count: 10
+  title_prefix: "POV:"
+  require_research_for_categories: [past, space, impossible]
+  continuity_rules:
+    - "first-person POV camera"
+    - "photorealistic cinematic realism"
+    - "consistent hands, sleeves, lighting, and environment between scenes"
+    - "no generated text or logos inside footage"
+    - "realistic physics and anatomy"
+    - "vertical framing with action kept inside central safe area"
+
+approvals:
+  require_idea_approval: true
+  require_script_approval: true
+  require_storyboard_approval: true
+  require_scene_approval: true
+  require_voice_approval: true
+  require_final_approval: true
+  require_publish_approval: true
+
+budgets:
+  currency: "USD"
+  monthly_cap: 100.00
+  target_cost_per_video: 1.10
+  hard_stop_on_cap: true
+  max_scene_regenerations: 2
+
+storage:
+  provider: "local"
+  local:
+    base_path: "./storage"
+  s3:
+    bucket: ""
+    region: ""
+    prefix: "impossible-pov"
+
+providers:
+  text: "mock"
+  research: "mock"
+  image: "mock"
+  video: "mock"
+  voice: "mock"
+  renderer: "mock"
+  publisher: "mock"
+
+provider_options:
+  openai:
+    model: "gpt-5.6-luna"
+    base_url: "https://api.openai.com/v1"
+    timeout_seconds: 90
+    max_output_tokens: 3500
+    temperature: 0.8
+    estimated_input_cost_per_million: 0.50
+    estimated_output_cost_per_million: 3.00
+  runway:
+    model: "gen4_turbo"
+    image_model: "gen4_image_turbo"
+    production_mode: "economy_hybrid"
+    motion_scene_indexes: [0, 2, 4]
+    image_cost: 0.02
+    hard_video_generation_cap: 1.25
+    clip_seconds: 5
+    aspect_ratio: "9:16"
+    polling_interval_seconds: 5
+    max_poll_minutes: 10
+    estimated_cost_per_second: 0.05
+  elevenlabs:
+    voice_id: ""
+    model_id: "eleven_multilingual_v2"
+    output_format: "mp3_44100_128"
+    estimated_cost_per_1000_chars: 0.10
+  ffmpeg:
+    binary: "ffmpeg"
+    codec: "libx264"
+    audio_codec: "aac"
+    preset: "medium"
+    crf: 18
+  youtube:
+    privacy_status: "private"
+    category_id: "24"
+    made_for_kids: false
+    default_tags: ["POV", "AI", "Shorts", "Impossible POV"]
+
+captions:
+  enabled: true
+  position: "center_lower"
+  uppercase: false
+  words_per_line: 4
+  font_size: 72
+  outline_width: 4
+
+branding:
+  watermark_enabled: false
+  watermark_path: "./assets/impossible-pov-logo.png"
+  watermark_position: "top_right"
+  watermark_opacity: 0.80
+
+prompts:
+  idea_system: |
+    You are the creative strategist for IMPOSSIBLE POV, a YouTube Shorts channel where every video puts the viewer inside an impossible first-person experience. Generate highly visual, curiosity-driven concepts spanning history, survival, future, space, and impossible science. Avoid generic listicles.
+  research_system: |
+    Build a concise factual research pack for a cinematic first-person YouTube Short. Separate well-established facts from uncertainty or speculation. Focus on sensory details that affect what the viewer would plausibly see, hear, feel, or experience. Flag claims that need external verification before publication.
+  script_system: |
+    Write an original EXACTLY 30-second cinematic first-person YouTube Short. Hook in the first 2 seconds. Maintain escalating tension and visual continuity. Return exactly 6 script segments, each exactly 5 seconds long, covering 0-5, 5-10, 10-15, 15-20, 20-25, and 25-30 seconds. Keep narration concise enough to fit the 30-second runtime. Do not imitate a living person's voice or copyrighted speech.
+  scene_system: |
+    Convert the approved script into photorealistic, vertical first-person scene prompts. Preserve continuity across clothing, hands, lighting, location, weather, camera behavior, and recurring subjects. No visible generated text.
