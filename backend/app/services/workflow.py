@@ -96,7 +96,7 @@ class WorkflowService:
         image_cost = float(opts.get("image_cost", 0.02)) if provider_name == "runway" else 0.0
         estimated = image_cost + (clip_seconds * float(opts.get("estimated_cost_per_second", 0.0)) if motion and provider_name == "runway" else 0.0)
         self.budget.assert_allowed(estimated)
-        result = self.providers.media("video").generate(prompt=scene["prompt"], scene_index=scene["index"], project_id=p.id, config=self.config, motion=motion)
+        result = self.providers.media("video").generate(prompt=scene["prompt"], scene_index=scene["index"], project_id=p.id, motion=motion)
         actual = float(result.get("cost", estimated if provider_name != "mock" else 0.0) or 0.0)
         self.budget.record(project_id=p.id, provider=provider_name, operation="video_scene" if motion else "scene_image", scene_index=scene["index"], estimated_cost=estimated, actual_cost=actual)
         return result, estimated, actual
