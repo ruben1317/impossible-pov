@@ -181,7 +181,7 @@ class WorkflowService:
         per_k = float(self.config.get("provider_options", {}).get("elevenlabs", {}).get("estimated_cost_per_1000_chars", 0.0)) if provider_name == "elevenlabs" else 0.0
         estimated = round(len(text) / 1000.0 * per_k, 4)
         self.budget.assert_allowed(estimated)
-        result = self.providers.media("voice").generate(text=text, project_id=p.id, config=self.config)
+        result = self.providers.media("video").generate(prompt=scene["prompt"],scene_index=scene["index"],project_id=p.id,motion=motion)
         actual = float(result.get("cost", estimated if provider_name != "mock" else 0.0) or 0.0)
         self.budget.record(project_id=p.id, provider=provider_name, operation="voice", estimated_cost=estimated, actual_cost=actual)
         p.estimated_cost = float(p.estimated_cost or 0) + estimated
