@@ -32,21 +32,25 @@ class MockTextProvider(TextProvider):
         ]
 
     def write_script(self, *, title: str, premise: str, research: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-        lines = [
-            (0, 3, "Don't move.", "POV eyes open; immediate environmental movement."),
-            (3, 8, "You went to sleep in 2026.", "Hands push forward into the environment."),
-            (8, 14, "But this isn't your world anymore.", "Reveal the impossible location."),
-            (14, 20, "And something nearby just noticed you.", "Subtle threat enters frame."),
-            (20, 27, "Your first problem isn't getting home.", "Viewer begins moving quickly."),
-            (27, 34, "It's surviving the next five minutes.", "Major threat reveal / action beat."),
-            (34, 38, "What would you do next?", "Cut toward a cliffhanger / loopable final frame."),
+        vd = config.get("video_defaults", {})
+        scene_count = int(vd.get("scene_count", 6))
+        clip_seconds = int(vd.get("clip_seconds", 5))
+        beats = [
+            ("Don't move.", "POV eyes open; immediate environmental movement."),
+            ("You went to sleep in 2026.", "Hands push forward into the environment."),
+            ("But this isn't your world anymore.", "Reveal the impossible location."),
+            ("And something nearby just noticed you.", "Subtle threat enters frame."),
+            ("Your first problem isn't getting home.", "Viewer begins moving quickly."),
+            ("It's surviving what happens next.", "Major threat reveal / action beat."),
         ]
+        segments=[]
+        for i in range(scene_count):
+            narration, visual = beats[i % len(beats)]
+            segments.append({"start": i*clip_seconds, "end": (i+1)*clip_seconds, "narration": narration, "visual": visual})
         return {
-            "hook": lines[0][2],
-            "narration": " ".join(x[2] for x in lines),
-            "segments": [
-                {"start": a, "end": b, "narration": n, "visual": v} for a, b, n, v in lines
-            ],
+            "hook": segments[0]["narration"] if segments else "Don't move.",
+            "narration": " ".join(x["narration"] for x in segments),
+            "segments": segments,
             "title": title,
             "description": f"Experience the impossible in first person. {premise}",
             "tags": ["POV", "AI", "Shorts", "Impossible POV"],

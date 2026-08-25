@@ -74,6 +74,18 @@ class OpenAITextProvider(_OpenAIBase, TextProvider):
         system = config.get("prompts", {}).get("script_system", "Write a POV short.")
         user = f"Title: {title}\\nPremise: {premise}\\nResearch: {json.dumps(research)}\\nReturn JSON with hook, narration, segments (start,end,narration,visual), title, description, tags."
         data, usage = self._json(system, user)
+        # Economy default is six 5-second scenes / 30 seconds total.
+        # Normalize model-provided timestamps so the UI and downstream scene timing
+        # cannot drift past the configured runtime.
+        vd = config.get("video_defaults", {})
+        scene_count = int(vd.get("scene_count", 6))
+        clip_seconds = int(vd.get("clip_seconds", 5))
+        duration_seconds = int(vd.get("duration_seconds", scene_count * clip_seconds))
+        segments = list(data.get("segments") or [])[:scene_count]
+        for i, seg in enumerate(segments):
+            seg["start"] = i * clip_seconds
+            seg["end"] = min((i + 1) * clip_seconds, duration_seconds)
+        data["segments"] = segments
         return data
 
     def storyboard(self, *, script: dict[str, Any], config: dict[str, Any]):

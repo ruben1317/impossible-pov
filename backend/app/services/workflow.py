@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from sqlmodel import Session
 
 from app.models.project import Project
+from app.models.idea_history import IdeaHistory
 from app.providers.registry import ProviderRegistry
 from app.services.budget import BudgetService, BudgetExceeded
 
@@ -28,7 +29,19 @@ class WorkflowService:
 
     def generate_ideas(self, count: int | None, category: str | None):
         n = count or self.config.get("content", {}).get("idea_count", 10)
-        return self.providers.text().generate_ideas(count=n, category=category, config=self.config)
+        rows = self.providers.text().generate_ideas(count=n, category=category, config=self.config)
+        # Keep every idea the user has already been shown so it can be revisited later
+        # without paying to generate the same batch again.
+        for row in rows:
+            self.session.add(IdeaHistory(
+                title=str(row.get("title", "Untitled POV")),
+                category=str(row.get("category", category or "impossible")),
+                premise=str(row.get("premise", "")),
+                viral_reason=str(row.get("viral_reason", "")),
+                estimated_cost=float(row.get("estimated_cost", 0.0) or 0.0),
+            ))
+        self.session.commit()
+        return rows
 
     def create_project(self, title: str, category: str, premise: str):
         p = Project(title=title, category=category, premise=premise, stage="idea", status="needs_review")

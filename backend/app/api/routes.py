@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from app.core.config import get_config
 from app.core.db import get_session
 from app.models.project import Project
+from app.models.idea_history import IdeaHistory
 from app.models.schemas import IdeaRequest, ProjectCreate, SceneDecision, SceneVideoDecision, PublishRequest, RuntimeSettingsUpdate
 from app.services.workflow import WorkflowService
 from app.services.budget import BudgetService, BudgetExceeded
@@ -30,6 +31,14 @@ def serialize(p: Project):
         "actual_cost": p.actual_cost, "created_at": p.created_at, "updated_at": p.updated_at,
     }
 
+
+
+def serialize_idea_history(row: IdeaHistory):
+    return {
+        "id": row.id, "title": row.title, "category": row.category, "premise": row.premise,
+        "viral_reason": row.viral_reason, "estimated_cost": row.estimated_cost,
+        "used": row.used, "project_id": row.project_id, "created_at": row.created_at,
+    }
 
 def svc(session): return WorkflowService(session, get_effective_config(session))
 
@@ -105,6 +114,24 @@ def update_runtime_settings(req: RuntimeSettingsUpdate, session: Session = Depen
 @router.post("/ideas")
 def ideas(req: IdeaRequest, session: Session = Depends(get_session)):
     return svc(session).generate_ideas(req.count, req.category)
+
+
+@router.get("/ideas/history")
+def idea_history(session: Session = Depends(get_session)):
+    rows = session.exec(select(IdeaHistory).order_by(IdeaHistory.created_at.desc())).all()
+    return [serialize_idea_history(x) for x in rows]
+
+
+@router.post("/ideas/history/{idea_id}/use")
+def use_history_idea(idea_id: int, session: Session = Depends(get_session)):
+    idea = session.get(IdeaHistory, idea_id)
+    if not idea:
+        raise HTTPException(404, "Idea not found")
+    project = svc(session).create_project(idea.title, idea.category, idea.premise)
+    idea.used = True
+    idea.project_id = project.id
+    session.add(idea); session.commit(); session.refresh(idea)
+    return serialize(project)
 
 @router.get("/projects")
 def projects(session: Session = Depends(get_session)):

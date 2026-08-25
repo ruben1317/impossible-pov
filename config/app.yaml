@@ -13,7 +13,7 @@ video_defaults:
   aspect_ratio: "9:16"
   width: 1080
   height: 1920
-  duration_seconds: 38
+  duration_seconds: 30
   fps: 30
   scene_count: 6
   clip_seconds: 5
@@ -126,6 +126,6 @@ prompts:
   research_system: |
     Build a concise factual research pack for a cinematic first-person YouTube Short. Separate well-established facts from uncertainty or speculation. Focus on sensory details that affect what the viewer would plausibly see, hear, feel, or experience. Flag claims that need external verification before publication.
   script_system: |
-    Write an original 30-45 second cinematic first-person YouTube Short. Hook in the first 2 seconds. Maintain escalating tension and visual continuity. Use short narration lines that pair naturally with 5-7 scenes. Do not imitate a living person's voice or copyrighted speech.
+    Write an original EXACTLY 30-second cinematic first-person YouTube Short. Hook in the first 2 seconds. Maintain escalating tension and visual continuity. Return exactly 6 script segments, each exactly 5 seconds long, covering 0-5, 5-10, 10-15, 15-20, 20-25, and 25-30 seconds. Keep narration concise enough to fit the 30-second runtime. Do not imitate a living person's voice or copyrighted speech.
   scene_system: |
     Convert the approved script into photorealistic, vertical first-person scene prompts. Preserve continuity across clothing, hands, lighting, location, weather, camera behavior, and recurring subjects. No visible generated text.

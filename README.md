@@ -1,10 +1,11 @@
-# IMPOSSIBLE POV Content Studio — V1.3 Economy Hybrid
+# IMPOSSIBLE POV Content Studio — V1.3.3 Economy Hybrid + Idea History
 
 A YouTube-only, semi-automatic AI video production studio designed to be operated from an iPhone after deployment.
 
-## What V1.3 adds
+## What V1.3.3 adds
 
 - Mobile-first dashboard, review queue, creation flow, and settings.
+- Persistent Idea History on Home: every generated idea is saved, can be reopened, and can be reused without generating another batch.
 - Fixed bottom navigation with large touch targets.
 - PWA metadata/icons so the deployed studio can be added to the iPhone Home Screen.
 - Runtime settings stored in the database instead of requiring YAML edits for everyday changes.
@@ -95,15 +96,22 @@ Keep all providers on `mock` first. Then enable one at a time from the phone Set
 
 The goal is that expensive generation and publishing remain behind explicit user approvals.
 
-## Important V1.3 limitation
+## Important V1.3.2 limitation
 
 Only the OpenAI text/research adapter is live in this version. Runway, ElevenLabs, FFmpeg, and YouTube remain provider placeholders until their adapters are wired. The mobile UI is ready for those connections, and the provider routing is configurable without changing workflow code.
 
 
-## V1.3 Economy Hybrid
+## V1.3.3 Economy Hybrid + Idea History
 - Economy scene plan: scenes 1, 3, 5 use Runway Gen-4 Turbo motion; scenes 2, 4, 6 use Gen-4 Image Turbo stills.
 - Hard scene-generation guardrail defaults to $1.25.
 - Per-scene approve/regenerate controls prevent paying to regenerate the whole video.
 - Runway live image + image-to-video adapter is wired to the API.
 - Economy mode forces Gen-4 Turbo for motion even if an older runtime override still says Gen-4.5.
 - Default target finished-video budget is $1.10.
+
+
+## V1.3.2 timing fix
+
+- Default runtime is 30 seconds.
+- Script timestamps display as real mm:ss (for example, 0:00–0:05), not 0:00–5:00.
+- Live scripts are normalized to six 5-second segments so they cannot drift beyond 30 seconds.
