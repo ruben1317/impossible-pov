@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from app.core.config import get_config
 from app.core.db import get_session
 from app.models.project import Project
-from app.models.schemas import IdeaRequest, ProjectCreate, SceneDecision, PublishRequest, RuntimeSettingsUpdate
+from app.models.schemas import IdeaRequest, ProjectCreate, SceneDecision, SceneVideoDecision, PublishRequest, RuntimeSettingsUpdate
 from app.services.workflow import WorkflowService
 from app.services.budget import BudgetService, BudgetExceeded
 from app.providers.registry import ProviderRegistry
@@ -144,6 +144,16 @@ def scene_decision(pid: int, req: SceneDecision, session: Session = Depends(get_
 def generate_video(pid: int, session: Session = Depends(get_session)):
     try: return serialize(svc(session).generate_video_scenes(project_or_404(session, pid)))
     except (ValueError, BudgetExceeded) as e: raise HTTPException(400, str(e))
+
+@router.post("/projects/{pid}/regenerate-video-scene")
+def regenerate_video_scene(pid: int, req: SceneVideoDecision, session: Session = Depends(get_session)):
+    try: return serialize(svc(session).regenerate_video_scene(project_or_404(session, pid), req.scene_index))
+    except (ValueError, BudgetExceeded) as e: raise HTTPException(400, str(e))
+
+@router.post("/projects/{pid}/approve-video-scene")
+def approve_video_scene(pid: int, req: SceneVideoDecision, session: Session = Depends(get_session)):
+    try: return serialize(svc(session).approve_video_scene(project_or_404(session, pid), req.scene_index))
+    except ValueError as e: raise HTTPException(400, str(e))
 
 @router.post("/projects/{pid}/approve-video-scenes")
 def approve_video(pid: int, session: Session = Depends(get_session)):

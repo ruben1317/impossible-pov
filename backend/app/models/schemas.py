@@ -35,6 +35,10 @@ class SceneDecision(BaseModel):
     notes: str = ""
 
 
+class SceneVideoDecision(BaseModel):
+    scene_index: int
+
+
 class PublishRequest(BaseModel):
     title: str | None = None
     description: str | None = None

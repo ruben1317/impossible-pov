@@ -71,32 +71,62 @@ class WorkflowService:
         touch(p); self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p
 
+    def _scene_plan(self, board):
+        opts = self.config.get("provider_options", {}).get("runway", {})
+        motion = set(int(x) for x in opts.get("motion_scene_indexes", [0, 2, 4]))
+        return [(scene, int(scene.get("index", i)) in motion) for i, scene in enumerate(board)]
+
+    def _generate_one_video_scene(self, p: Project, scene: dict, motion: bool):
+        provider_name = self.config.get("providers", {}).get("video", "mock")
+        opts = self.config.get("provider_options", {}).get("runway", {})
+        clip_seconds = float(opts.get("clip_seconds", self.config.get("video_defaults", {}).get("clip_seconds", 5)))
+        image_cost = float(opts.get("image_cost", 0.02)) if provider_name == "runway" else 0.0
+        estimated = image_cost + (clip_seconds * float(opts.get("estimated_cost_per_second", 0.0)) if motion and provider_name == "runway" else 0.0)
+        self.budget.assert_allowed(estimated)
+        result = self.providers.media("video").generate(prompt=scene["prompt"], scene_index=scene["index"], project_id=p.id, config=self.config, motion=motion)
+        actual = float(result.get("cost", estimated if provider_name != "mock" else 0.0) or 0.0)
+        self.budget.record(project_id=p.id, provider=provider_name, operation="video_scene" if motion else "scene_image", scene_index=scene["index"], estimated_cost=estimated, actual_cost=actual)
+        return result, estimated, actual
+
     def generate_video_scenes(self, p: Project):
         board = load(p.storyboard_json, [])
-        if not board or not all(x.get("approved") for x in board):
-            raise ValueError("Approve all storyboard scenes before generating video")
-        provider_name = self.config.get("providers", {}).get("video", "mock")
-        clip_seconds = float(self.config.get("provider_options", {}).get("runway", {}).get("clip_seconds", self.config.get("video_defaults", {}).get("clip_seconds", 5)))
-        cps = float(self.config.get("provider_options", {}).get("runway", {}).get("estimated_cost_per_second", 0.0)) if provider_name == "runway" else 0.0
-        estimated_total = round(len(board) * clip_seconds * cps, 4)
+        if not board or not all(x.get("approved") for x in board): raise ValueError("Approve all storyboard scenes before generating video")
+        plan = self._scene_plan(board)
+        opts = self.config.get("provider_options", {}).get("runway", {})
+        clip = float(opts.get("clip_seconds", 5)); cps=float(opts.get("estimated_cost_per_second",0)); img=float(opts.get("image_cost",0))
+        estimated_total = round(sum(img + (clip*cps if motion else 0) for _, motion in plan), 4) if self.config.get("providers",{}).get("video")=="runway" else 0
+        hard_cap=float(opts.get("hard_video_generation_cap",1.25))
+        if estimated_total > hard_cap: raise BudgetExceeded(f"Planned scene generation ${estimated_total:.2f} exceeds the ${hard_cap:.2f} economy cap")
         self.budget.assert_allowed(estimated_total)
-        provider = self.providers.media("video")
-        scenes = []
-        for scene in board:
-            estimated = round(clip_seconds * cps, 4)
-            result = provider.generate(prompt=scene["prompt"], scene_index=scene["index"], project_id=p.id, config=self.config)
-            actual = float(result.get("cost", estimated if provider_name != "mock" else 0.0) or 0.0)
-            self.budget.record(project_id=p.id, provider=provider_name, operation="video_scene", scene_index=scene["index"], estimated_cost=estimated, actual_cost=actual)
-            scenes.append({**scene, "video": result, "video_approved": False})
-        p.estimated_cost = float(p.estimated_cost or 0) + estimated_total
-        p.actual_cost = float(p.actual_cost or 0) + sum(float(s["video"].get("cost", 0) or 0) for s in scenes)
-        p.scenes_json = dump(scenes); p.stage = "video_scenes"; p.status = "needs_review"; touch(p)
-        self.session.add(p); self.session.commit(); self.session.refresh(p)
-        return p
+        scenes=[]; actual_total=0
+        for scene,motion in plan:
+            result, estimated, actual=self._generate_one_video_scene(p,scene,motion); actual_total+=actual
+            scenes.append({**scene,"production_type":"video" if motion else "animated_still","video":result,"video_approved":False})
+        p.estimated_cost=float(p.estimated_cost or 0)+estimated_total; p.actual_cost=float(p.actual_cost or 0)+actual_total
+        p.scenes_json=dump(scenes); p.stage="video_scenes"; p.status="needs_review"; touch(p)
+        self.session.add(p); self.session.commit(); self.session.refresh(p); return p
+
+    def approve_video_scene(self, p: Project, idx: int):
+        scenes=load(p.scenes_json,[])
+        if idx<0 or idx>=len(scenes): raise ValueError("Invalid scene index")
+        scenes[idx]["video_approved"]=True; p.scenes_json=dump(scenes); touch(p)
+        self.session.add(p); self.session.commit(); self.session.refresh(p); return p
+
+    def regenerate_video_scene(self, p: Project, idx: int):
+        scenes=load(p.scenes_json,[])
+        if idx<0 or idx>=len(scenes): raise ValueError("Invalid scene index")
+        max_regens=int(self.config.get("budgets",{}).get("max_scene_regenerations",2)); count=int(scenes[idx].get("video_regenerations",0))
+        if count>=max_regens: raise ValueError(f"Scene regeneration limit reached ({max_regens})")
+        motion=scenes[idx].get("production_type")=="video"
+        result,estimated,actual=self._generate_one_video_scene(p,scenes[idx],motion)
+        scenes[idx]["video"]=result; scenes[idx]["video_approved"]=False; scenes[idx]["video_regenerations"]=count+1
+        p.estimated_cost=float(p.estimated_cost or 0)+estimated; p.actual_cost=float(p.actual_cost or 0)+actual; p.scenes_json=dump(scenes); touch(p)
+        self.session.add(p); self.session.commit(); self.session.refresh(p); return p
 
     def approve_all_video_scenes(self, p: Project):
         scenes = load(p.scenes_json, [])
-        for s in scenes: s["video_approved"] = True
+        if not scenes or not all(s.get("video_approved") for s in scenes):
+            raise ValueError("Approve every generated scene before continuing")
         p.scenes_json = dump(scenes); p.stage = "voice"; p.status = "ready_to_generate"; touch(p)
         self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p

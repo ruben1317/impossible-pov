@@ -46,9 +46,9 @@ approvals:
 budgets:
   currency: "USD"
   monthly_cap: 100.00
-  target_cost_per_video: 2.50
+  target_cost_per_video: 1.10
   hard_stop_on_cap: true
-  max_scene_regenerations: 3
+  max_scene_regenerations: 2
 
 storage:
   provider: "local"
@@ -79,6 +79,11 @@ provider_options:
     estimated_output_cost_per_million: 3.00
   runway:
     model: "gen4_turbo"
+    image_model: "gen4_image_turbo"
+    production_mode: "economy_hybrid"
+    motion_scene_indexes: [0, 2, 4]
+    image_cost: 0.02
+    hard_video_generation_cap: 1.25
     clip_seconds: 5
     aspect_ratio: "9:16"
     polling_interval_seconds: 5

@@ -106,8 +106,47 @@ class GenericRealMediaProvider(MediaProvider):
         self.provider = provider
         self.config = config
 
+    def _runway(self, *, prompt: str, scene_index: int, project_id: int, motion: bool = True):
+        import time
+        key = get_env().runway_api_key
+        if not key:
+            raise RuntimeError("RUNWAY_API_KEY is not configured")
+        opts = self.config.get("provider_options", {}).get("runway", {})
+        headers = {"Authorization": f"Bearer {key}", "X-Runway-Version": "2024-11-06", "Content-Type": "application/json"}
+        base = "https://api.dev.runwayml.com/v1"
+        ratio = "720:1280"  # native vertical and inexpensive
+        image_model = opts.get("image_model", "gen4_image_turbo")
+        video_model = "gen4_turbo" if opts.get("production_mode") == "economy_hybrid" else opts.get("model", "gen4_turbo")
+        duration = int(opts.get("clip_seconds", 5))
+        timeout = float(opts.get("max_poll_minutes", 10)) * 60
+
+        def wait(task_id: str):
+            deadline = time.time() + timeout
+            with httpx.Client(timeout=60) as client:
+                while time.time() < deadline:
+                    r = client.get(f"{base}/tasks/{task_id}", headers=headers); r.raise_for_status(); data = r.json()
+                    if data.get("status") == "SUCCEEDED": return data
+                    if data.get("status") in ("FAILED", "CANCELED"): raise RuntimeError(f"Runway task {data.get('status')}: {data.get('failure') or data}")
+                    time.sleep(float(opts.get("polling_interval_seconds", 5)))
+            raise TimeoutError("Runway generation timed out")
+
+        with httpx.Client(timeout=90) as client:
+            r = client.post(f"{base}/text_to_image", headers=headers, json={"model": image_model, "promptText": prompt, "ratio": ratio}); r.raise_for_status()
+            image_task = wait(r.json()["id"])
+            image_url = (image_task.get("output") or [None])[0]
+            image_cost = float(opts.get("image_cost", 0.02))
+            if not motion:
+                return {"provider":"runway","status":"succeeded","asset_type":"animated_still","image_url":image_url,"url":image_url,"cost":image_cost,"scene_index":scene_index,"project_id":project_id}
+            r = client.post(f"{base}/image_to_video", headers=headers, json={"model": video_model, "promptImage": image_url, "promptText": prompt, "duration": duration, "ratio": ratio}); r.raise_for_status()
+            video_task = wait(r.json()["id"])
+            video_url = (video_task.get("output") or [None])[0]
+            cost = image_cost + duration * float(opts.get("estimated_cost_per_second", 0.05))
+            return {"provider":"runway","status":"succeeded","asset_type":"video","image_url":image_url,"url":video_url,"cost":round(cost,4),"scene_index":scene_index,"project_id":project_id}
+
     def generate(self, **kwargs) -> dict[str, Any]:
+        if self.kind == "video" and self.provider == "runway":
+            return self._runway(**kwargs)
         raise NotImplementedError(
             f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
-            "Credentials belong in .env and all behavior/model settings belong in config/app.yaml."
+            "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
         )
