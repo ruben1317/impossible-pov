@@ -1,8 +1,8 @@
-# IMPOSSIBLE POV Content Studio — V1.2 Mobile
+# IMPOSSIBLE POV Content Studio — V1.3 Economy Hybrid
 
 A YouTube-only, semi-automatic AI video production studio designed to be operated from an iPhone after deployment.
 
-## What V1.2 adds
+## What V1.3 adds
 
 - Mobile-first dashboard, review queue, creation flow, and settings.
 - Fixed bottom navigation with large touch targets.
@@ -95,7 +95,7 @@ Keep all providers on `mock` first. Then enable one at a time from the phone Set
 
 The goal is that expensive generation and publishing remain behind explicit user approvals.
 
-## Important V1.2 limitation
+## Important V1.3 limitation
 
 Only the OpenAI text/research adapter is live in this version. Runway, ElevenLabs, FFmpeg, and YouTube remain provider placeholders until their adapters are wired. The mobile UI is ready for those connections, and the provider routing is configurable without changing workflow code.
 
