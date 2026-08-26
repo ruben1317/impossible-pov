@@ -38,6 +38,8 @@ class SceneDecision(BaseModel):
 class SceneVideoDecision(BaseModel):
     scene_index: int
 
+class ScriptRevisionRequest(BaseModel):
+    instructions: str = Field(min_length=1, max_length=6000)
 
 class PublishRequest(BaseModel):
     title: str | None = None
