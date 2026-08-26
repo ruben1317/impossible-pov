@@ -260,17 +260,64 @@ class WorkflowService:
     def generate_voice(self, p: Project):
         script = load(p.script_json, {})
         text = script.get("narration", "")
+
+        if not text:
+            segments = script.get("segments", [])
+            text = " ".join(
+                str(segment.get("narration", "")).strip()
+                for segment in segments
+                if segment.get("narration")
+            ).strip()
+
+        if not text:
+            raise ValueError("No narration found in the approved script")
+
         provider_name = self.config.get("providers", {}).get("voice", "mock")
-        per_k = float(self.config.get("provider_options", {}).get("elevenlabs", {}).get("estimated_cost_per_1000_chars", 0.0)) if provider_name == "elevenlabs" else 0.0
+
+        per_k = (
+            float(
+                self.config.get("provider_options", {})
+                .get("elevenlabs", {})
+                .get("estimated_cost_per_1000_chars", 0.0)
+            )
+            if provider_name == "elevenlabs"
+            else 0.0
+        )
+
         estimated = round(len(text) / 1000.0 * per_k, 4)
         self.budget.assert_allowed(estimated)
-        result = self.providers.media("video").generate(prompt=scene["prompt"],scene_index=scene["index"],project_id=p.id,motion=motion)
-        actual = float(result.get("cost", estimated if provider_name != "mock" else 0.0) or 0.0)
-        self.budget.record(project_id=p.id, provider=provider_name, operation="voice", estimated_cost=estimated, actual_cost=actual)
+
+        result = self.providers.media("voice").generate(
+            text=text,
+            project_id=p.id,
+        )
+
+        actual = float(
+            result.get(
+                "cost",
+                estimated if provider_name != "mock" else 0.0,
+            )
+            or 0.0
+        )
+
+        self.budget.record(
+            project_id=p.id,
+            provider=provider_name,
+            operation="voice",
+            estimated_cost=estimated,
+            actual_cost=actual,
+        )
+
         p.estimated_cost = float(p.estimated_cost or 0) + estimated
         p.actual_cost = float(p.actual_cost or 0) + actual
-        p.voice_json = dump(result); p.stage = "voice"; p.status = "needs_review"; touch(p)
-        self.session.add(p); self.session.commit(); self.session.refresh(p)
+        p.voice_json = dump(result)
+        p.stage = "voice"
+        p.status = "needs_review"
+        touch(p)
+
+        self.session.add(p)
+        self.session.commit()
+        self.session.refresh(p)
         return p
 
     def approve_voice(self, p: Project):
