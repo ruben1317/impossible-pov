@@ -326,10 +326,20 @@ class WorkflowService:
         return p
 
     def render(self, p: Project):
-        result = self.providers.media("renderer").generate(project_id=p.id)
-        p.render_json = dump(result); p.stage = "final"; p.status = "needs_review"; touch(p)
-        self.session.add(p); self.session.commit(); self.session.refresh(p)
-        return p
+        scenes = load(p.scenes_json, [])
+        voice = load(p.voice_json, {})
+
+        if not scenes:
+            raise ValueError("No generated scenes found")
+
+        if not voice.get("path"):
+            raise ValueError("No generated narration found")
+
+        result = self.providers.media("renderer").generate(
+            project_id=p.id,
+            scenes=scenes,
+            voice=voice,
+        )
 
     def approve_final(self, p: Project):
         p.stage = "publish"; p.status = "ready_to_publish"; touch(p)
