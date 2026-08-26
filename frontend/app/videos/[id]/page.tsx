@@ -35,3 +35,110 @@ function Workflow({p,busy,act}:{p:any,busy:boolean,act:(path:string,body?:any)=>
  if(p.stage==="published")return <div><span className="badge green">Published</span><p className="muted">Publishing result: {p.publish?.url||p.publish?.status||"complete"}</p></div>;
  return <p className="muted">Waiting for the next action.</p>
 }
+
+function ScriptReview({
+  p,
+  busy,
+  act,
+}: {
+  p: any;
+  busy: boolean;
+  act: (path: string, body?: any) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [instructions, setInstructions] = useState("");
+
+  function applyChanges() {
+    const text = instructions.trim();
+    if (!text) return;
+
+    act("revise-script", {
+      instructions: text,
+    });
+
+    setEditing(false);
+    setInstructions("");
+  }
+
+  return (
+    <div className="stack">
+      <p>
+        Review the full script below. No video generation has happened yet.
+      </p>
+
+      {!editing && (
+        <>
+          <button
+            className="btn primary"
+            disabled={busy}
+            onClick={() => act("approve-script")}
+          >
+            Approve Script
+          </button>
+
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={() => setEditing(true)}
+          >
+            Edit Script
+          </button>
+
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={() => act("regenerate-script")}
+          >
+            ↻ Regenerate Script
+          </button>
+        </>
+      )}
+
+      {editing && (
+        <div className="stack">
+          <label>
+            <strong>What would you like changed?</strong>
+          </label>
+
+          <p className="muted">
+            Paste revision instructions here. AI will rewrite the script using
+            your requested changes before you approve it.
+          </p>
+
+          <textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Example: Change Scene 3 so there is no readable text on the time machine. Replace IMPACT DETECTED with flashing red warning lights, while keeping the rest of the script the same."
+            rows={9}
+            style={{
+              width: "100%",
+              resize: "vertical",
+              padding: 12,
+              borderRadius: 10,
+              font: "inherit",
+            }}
+          />
+
+          <button
+            className="btn primary"
+            disabled={busy || !instructions.trim()}
+            onClick={applyChanges}
+          >
+            {busy ? "Applying Changes..." : "Apply Changes"}
+          </button>
+
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={() => {
+              setEditing(false);
+              setInstructions("");
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
