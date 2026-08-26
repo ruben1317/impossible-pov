@@ -90,7 +90,7 @@ provider_options:
     max_poll_minutes: 10
     estimated_cost_per_second: 0.05
   elevenlabs:
-    voice_id: ""
+    voice_id: "gfRt6Z3Z8aTbpLfexQ7N"
     model_id: "eleven_multilingual_v2"
     output_format: "mp3_44100_128"
     estimated_cost_per_1000_chars: 0.10
