@@ -337,7 +337,56 @@ class WorkflowService:
         return p
 
     def publish(self, p: Project, metadata: dict):
-        result = self.providers.media("publisher").generate(project_id=p.id, metadata=metadata)
-        p.publish_json = dump(result); p.stage = "published"; p.status = "published"; touch(p)
-        self.session.add(p); self.session.commit(); self.session.refresh(p)
+        requested_platforms = metadata.get(
+            "platforms",
+            ["youtube", "tiktok"],
+        )
+
+        allowed_platforms = {"youtube", "tiktok"}
+        platforms = []
+
+        for platform in requested_platforms:
+            name = str(platform).lower().strip()
+
+            if name in allowed_platforms and name not in platforms:
+                platforms.append(name)
+
+        if not platforms:
+            raise ValueError("Select at least one publishing platform")
+
+        existing = load(p.publish_json, {})
+        results = existing.get("platforms", {})
+
+        for platform in platforms:
+            platform_metadata = {
+                **metadata,
+                "platform": platform,
+            }
+
+            result = self.providers.media("publisher").generate(
+                project_id=p.id,
+                metadata=platform_metadata,
+            )
+
+            results[platform] = result
+
+        p.publish_json = dump({
+            "platforms": results,
+        })
+
+        youtube_published = bool(results.get("youtube"))
+        tiktok_published = bool(results.get("tiktok"))
+
+        if youtube_published and tiktok_published:
+            p.stage = "published"
+            p.status = "published"
+        else:
+            p.stage = "publish"
+            p.status = "partially_published"
+
+        touch(p)
+
+        self.session.add(p)
+        self.session.commit()
+        self.session.refresh(p)
         return p
