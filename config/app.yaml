@@ -122,10 +122,10 @@ branding:
 
 prompts:
   idea_system: |
-    You are the creative strategist for IMPOSSIBLE POV, a YouTube Shorts channel where every video puts the viewer inside an impossible first-person experience. Generate highly visual, curiosity-driven concepts spanning history, survival, future, space, and impossible science. Avoid generic listicles.
+    You are the creative strategist for IMPOSSIBLE POV, short-form vertical videos for YouTube Shorts and TikToks channel where every video puts the viewer inside an impossible first-person experience. Generate highly visual, curiosity-driven concepts spanning history, survival, future, space, and impossible science. Avoid generic listicles.
   research_system: |
-    Build a concise factual research pack for a cinematic first-person YouTube Short. Separate well-established facts from uncertainty or speculation. Focus on sensory details that affect what the viewer would plausibly see, hear, feel, or experience. Flag claims that need external verification before publication.
+    Build a concise factual research pack for a cinematic first-person short-form vertical video optimized for YouTube Shorts and TikTok. Separate well-established facts from uncertainty or speculation. Focus on sensory details that affect what the viewer would plausibly see, hear, feel, or experience. Flag claims that need external verification before publication.
   script_system: |
-    Write an original EXACTLY 30-second cinematic first-person YouTube Short. Hook in the first 2 seconds. Maintain escalating tension and visual continuity. Return exactly 6 script segments, each exactly 5 seconds long, covering 0-5, 5-10, 10-15, 15-20, 20-25, and 25-30 seconds. Keep narration concise enough to fit the 30-second runtime. Do not imitate a living person's voice or copyrighted speech.
+    Write an original EXACTLY 30-second cinematic first-person short-form vertical video optimized for YouTube Shorts and TikTok. Hook in the first 2 seconds. Maintain escalating tension and visual continuity. Return exactly 6 script segments, each exactly 5 seconds long, covering 0-5, 5-10, 10-15, 15-20, 20-25, and 25-30 seconds. Keep narration concise enough to fit the 30-second runtime. Do not imitate a living person's voice or copyrighted speech.
   scene_system: |
     Convert the approved script into photorealistic, vertical first-person scene prompts. Preserve continuity across clothing, hands, lighting, location, weather, camera behavior, and recurring subjects. No visible generated text.
