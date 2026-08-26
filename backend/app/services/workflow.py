@@ -108,7 +108,7 @@ class WorkflowService:
                 "Keep the configured total runtime and scene count.",
                 "Preserve good material unless the instructions ask to change it.",
                 "Avoid readable AI-generated text in visual descriptions unless specifically requested.",
-                "Keep the video first-person POV and optimized for YouTube Shorts retention.",
+                "Keep the video first-person POV and optimized for YouTube Shorts and TikTok retention.",
             ],
         }
 
