@@ -31,8 +31,81 @@ function Workflow({p,busy,act}:{p:any,busy:boolean,act:(path:string,body?:any)=>
  if(p.stage==="voice")return <button className="btn primary" disabled={busy} onClick={()=>act("approve-voice")}>Approve Narration</button>;
  if(p.stage==="render"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("render")}>Render Final Short</button>;
  if(p.stage==="final")return <button className="btn primary" disabled={busy} onClick={()=>act("approve-final")}>Approve Final Video</button>;
- if(p.stage==="publish")return <div className="stack"><p>Publishing is YouTube-only. Mock mode will not contact YouTube.</p><button className="btn primary" disabled={busy} onClick={()=>act("publish",{})}>Publish to YouTube</button></div>;
- if(p.stage==="published")return <div><span className="badge green">Published</span><p className="muted">Publishing result: {p.publish?.url||p.publish?.status||"complete"}</p></div>;
+ if(p.stage==="publish")return (
+  <div className="stack">
+    <p>
+      Choose where to publish the approved final video.
+      The same vertical master is used for both platforms.
+    </p>
+
+    <div className="row">
+      <span className={`badge ${p.publish?.platforms?.youtube ? "green" : ""}`}>
+        YouTube {p.publish?.platforms?.youtube ? "✓" : ""}
+      </span>
+
+      <span className={`badge ${p.publish?.platforms?.tiktok ? "green" : ""}`}>
+        TikTok {p.publish?.platforms?.tiktok ? "✓" : ""}
+      </span>
+    </div>
+
+    {!p.publish?.platforms?.youtube && (
+      <button
+        className="btn"
+        disabled={busy}
+        onClick={() =>
+          act("publish", {
+            platforms: ["youtube"],
+          })
+        }
+      >
+        Publish to YouTube
+      </button>
+    )}
+
+    {!p.publish?.platforms?.tiktok && (
+      <button
+        className="btn"
+        disabled={busy}
+        onClick={() =>
+          act("publish", {
+            platforms: ["tiktok"],
+          })
+        }
+      >
+        Publish to TikTok
+      </button>
+    )}
+
+    {!p.publish?.platforms?.youtube &&
+      !p.publish?.platforms?.tiktok && (
+        <button
+          className="btn primary"
+          disabled={busy}
+          onClick={() =>
+            act("publish", {
+              platforms: ["youtube", "tiktok"],
+            })
+          }
+        >
+          Publish to Both
+        </button>
+      )}
+
+    <p className="muted">
+      Publishing remains manual. Nothing is posted until you choose a platform above.
+    </p>
+  </div>
+);
+ if(p.stage==="published")return (
+  <div className="stack">
+    <span className="badge green">Published to both platforms</span>
+
+    <div className="row">
+      <span className="badge green">YouTube ✓</span>
+      <span className="badge green">TikTok ✓</span>
+    </div>
+  </div>
+);
  return <p className="muted">Waiting for the next action.</p>
 }
 
