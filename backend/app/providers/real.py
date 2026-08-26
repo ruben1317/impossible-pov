@@ -218,9 +218,110 @@ class GenericRealMediaProvider(MediaProvider):
             cost = image_cost + duration * float(opts.get("estimated_cost_per_second", 0.05))
             return {"provider":"runway","status":"succeeded","asset_type":"video","image_url":image_url,"url":video_url,"cost":round(cost,4),"scene_index":scene_index,"project_id":project_id}
 
+    def _elevenlabs(self, *, text: str, project_id: int):
+        key = get_env().elevenlabs_api_key
+        if not key:
+            raise RuntimeError("ELEVENLABS_API_KEY is not configured")
+
+        opts = self.config.get("provider_options", {}).get("elevenlabs", {})
+        voice_id = str(opts.get("voice_id", "")).strip()
+        model_id = str(
+            opts.get("model_id", "eleven_multilingual_v2")
+        ).strip()
+        output_format = str(
+            opts.get("output_format", "mp3_44100_128")
+        ).strip()
+
+        if not voice_id:
+            raise RuntimeError("ElevenLabs voice_id is not configured")
+
+        url = (
+            f"https://api.elevenlabs.io/v1/text-to-speech/"
+            f"{voice_id}?output_format={output_format}"
+        )
+
+        payload = {
+            "text": text,
+            "model_id": model_id,
+        }
+
+        headers = {
+            "xi-api-key": key,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+        }
+
+        with httpx.Client(timeout=90) as client:
+            response = client.post(
+                url,
+                headers=headers,
+                json=payload,
+            )
+
+        if response.is_error:
+            detail = (response.text or "").strip()
+
+            if len(detail) > 1200:
+                detail = detail[:1200] + "…"
+
+            raise RuntimeError(
+                f"ElevenLabs text-to-speech failed with HTTP "
+                f"{response.status_code}: "
+                f"{detail or response.reason_phrase}"
+            )
+
+        import os
+
+        base_path = (
+            self.config.get("storage", {})
+            .get("local", {})
+            .get("base_path", "./storage")
+        )
+
+        voice_dir = os.path.join(
+            base_path,
+            "projects",
+            str(project_id),
+            "voice",
+        )
+
+        os.makedirs(voice_dir, exist_ok=True)
+
+        audio_path = os.path.join(
+            voice_dir,
+            "narration.mp3",
+        )
+
+        with open(audio_path, "wb") as f:
+            f.write(response.content)
+
+        per_k = float(
+            opts.get(
+                "estimated_cost_per_1000_chars",
+                0.0,
+            )
+        )
+
+        cost = round(
+            len(text) / 1000.0 * per_k,
+            4,
+        )
+
+        return {
+            "provider": "elevenlabs",
+            "status": "succeeded",
+            "path": audio_path,
+            "cost": cost,
+            "project_id": project_id,
+        }
+    
     def generate(self, **kwargs) -> dict[str, Any]:
         if self.kind == "video" and self.provider == "runway":
             return self._runway(**kwargs)
+
+        if self.kind == "voice" and self.provider == "elevenlabs":
+            return self._elevenlabs(**kwargs)
+
         raise NotImplementedError(
             f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
             "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
