@@ -8,7 +8,15 @@ from app.core.config import get_config
 from app.core.db import get_session
 from app.models.project import Project
 from app.models.idea_history import IdeaHistory
-from app.models.schemas import IdeaRequest, ProjectCreate, SceneDecision, SceneVideoDecision, PublishRequest, RuntimeSettingsUpdate
+from app.models.schemas import (
+    IdeaRequest,
+    ProjectCreate,
+    SceneDecision,
+    SceneVideoDecision,
+    ScriptRevisionRequest,
+    PublishRequest,
+    RuntimeSettingsUpdate,
+)
 from app.services.workflow import WorkflowService
 from app.services.budget import BudgetService, BudgetExceeded
 from app.providers.registry import ProviderRegistry
@@ -153,6 +161,38 @@ def approve_idea(pid: int, session: Session = Depends(get_session)):
 @router.post("/projects/{pid}/generate-script")
 def generate_script(pid: int, session: Session = Depends(get_session)):
     return serialize(svc(session).generate_script(project_or_404(session, pid)))
+
+
+@router.post("/projects/{pid}/regenerate-script")
+def regenerate_script(pid: int, session: Session = Depends(get_session)):
+    try:
+        return serialize(
+            svc(session).regenerate_script(
+                project_or_404(session, pid)
+            )
+        )
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+
+
+@router.post("/projects/{pid}/revise-script")
+def revise_script(
+    pid: int,
+    req: ScriptRevisionRequest,
+    session: Session = Depends(get_session),
+):
+    try:
+        return serialize(
+            svc(session).revise_script(
+                project_or_404(session, pid),
+                req.instructions,
+            )
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+
 
 @router.post("/projects/{pid}/approve-script")
 def approve_script(pid: int, session: Session = Depends(get_session)):
