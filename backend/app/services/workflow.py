@@ -61,7 +61,7 @@ class WorkflowService:
         self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p
 
-        def regenerate_script(self, p: Project):
+    def regenerate_script(self, p: Project):
         research = load(p.research_json, {})
         script = self.providers.text().write_script(
             title=p.title,
