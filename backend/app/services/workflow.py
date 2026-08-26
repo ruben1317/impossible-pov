@@ -61,6 +61,89 @@ class WorkflowService:
         self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p
 
+    def regenerate_script(self, p: Project):
+        research = load(p.research_json, {})
+        script = self.providers.text().write_script(
+        title=p.title,
+        premise=p.premise,
+        research=research,
+        config=self.config,
+        )
+
+        p.script_json = dump(script)
+
+        # A new script invalidates anything downstream.
+        p.storyboard_json = "[]"
+        p.scenes_json = "[]"
+        p.voice_json = "{}"
+        p.render_json = "{}"
+        p.publish_json = "{}"
+
+        p.stage = "script"
+        p.status = "needs_review"
+        touch(p)
+
+        self.session.add(p)
+        self.session.commit()
+        self.session.refresh(p)
+        return p
+
+    def revise_script(self, p: Project, instructions: str):
+    instructions = (instructions or "").strip()
+
+    if not instructions:
+        raise ValueError("Revision instructions are required")
+
+    current_script = load(p.script_json, {})
+    if not current_script:
+        raise ValueError("Generate a script before editing it")
+
+    research = load(p.research_json, {})
+
+    revision_context = {
+        "existing_script": current_script,
+        "revision_instructions": instructions,
+        "requirements": [
+            "Return the complete revised script, not only a list of edits.",
+            "Keep the configured total runtime and scene count.",
+            "Preserve good material unless the instructions ask to change it.",
+            "Avoid readable AI-generated text in visual descriptions unless specifically requested.",
+            "Keep the video first-person POV and optimized for YouTube Shorts retention.",
+        ],
+    }
+
+    revision_premise = (
+        f"{p.premise}\n\n"
+        "REVISION TASK: Revise the existing script using the instructions below. "
+        "Do not ignore the existing script. "
+        f"{json.dumps(revision_context, ensure_ascii=False)}"
+    )
+
+    script = self.providers.text().write_script(
+        title=p.title,
+        premise=revision_premise,
+        research=research,
+        config=self.config,
+    )
+
+    p.script_json = dump(script)
+
+    # Script edits invalidate downstream creative work.
+    p.storyboard_json = "[]"
+    p.scenes_json = "[]"
+    p.voice_json = "{}"
+    p.render_json = "{}"
+    p.publish_json = "{}"
+
+    p.stage = "script"
+    p.status = "needs_review"
+    touch(p)
+
+    self.session.add(p)
+    self.session.commit()
+    self.session.refresh(p)
+    return p
+    
     def approve_script(self, p: Project):
         p.stage = "storyboard"; p.status = "ready_to_generate"; touch(p)
         self.session.add(p); self.session.commit(); self.session.refresh(p)
