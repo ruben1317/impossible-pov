@@ -46,6 +46,9 @@ class PublishRequest(BaseModel):
     description: str | None = None
     privacy_status: str | None = None
     scheduled_at: str | None = None
+    platforms: list[str] = Field(
+        default_factory=lambda: ["youtube", "tiktok"]
+    )
 
 
 class RuntimeSettingsUpdate(BaseModel):
