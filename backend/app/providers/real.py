@@ -314,6 +314,240 @@ class GenericRealMediaProvider(MediaProvider):
             "cost": cost,
             "project_id": project_id,
         }
+        
+def _ffmpeg(self, *, project_id: int, scenes: list, voice: dict):
+    import os
+    import subprocess
+
+    opts = self.config.get("provider_options", {}).get("ffmpeg", {})
+    vd = self.config.get("video_defaults", {})
+
+    binary = str(opts.get("binary", "ffmpeg"))
+    codec = str(opts.get("codec", "libx264"))
+    audio_codec = str(opts.get("audio_codec", "aac"))
+    preset = str(opts.get("preset", "medium"))
+    crf = str(opts.get("crf", 18))
+
+    width = int(vd.get("width", 1080))
+    height = int(vd.get("height", 1920))
+    fps = int(vd.get("fps", 30))
+    clip_seconds = float(vd.get("clip_seconds", 5))
+
+    base_path = (
+        self.config.get("storage", {})
+        .get("local", {})
+        .get("base_path", "./storage")
+    )
+
+    project_dir = os.path.join(
+        base_path,
+        "projects",
+        str(project_id),
+    )
+
+    render_dir = os.path.join(project_dir, "render")
+    scene_dir = os.path.join(project_dir, "render_scenes")
+
+    os.makedirs(render_dir, exist_ok=True)
+    os.makedirs(scene_dir, exist_ok=True)
+
+    voice_path = str(voice.get("path", "")).strip()
+
+    if not voice_path or not os.path.exists(voice_path):
+        raise RuntimeError(
+            f"Narration file not found: {voice_path}"
+        )
+
+    normalized_clips = []
+
+    with httpx.Client(timeout=120, follow_redirects=True) as client:
+        for i, scene in enumerate(scenes):
+            video = scene.get("video") or {}
+            source_url = str(video.get("url", "")).strip()
+
+            if not source_url:
+                raise RuntimeError(
+                    f"Scene {i + 1} has no generated media URL"
+                )
+
+            production_type = scene.get(
+                "production_type",
+                "video",
+            )
+
+            ext = ".mp4" if production_type == "video" else ".jpg"
+
+            source_path = os.path.join(
+                scene_dir,
+                f"source_{i:02d}{ext}",
+            )
+
+            response = client.get(source_url)
+            response.raise_for_status()
+
+            with open(source_path, "wb") as f:
+                f.write(response.content)
+
+            clip_path = os.path.join(
+                scene_dir,
+                f"clip_{i:02d}.mp4",
+            )
+
+            vf = (
+                f"scale={width}:{height}:"
+                "force_original_aspect_ratio=increase,"
+                f"crop={width}:{height},"
+                f"fps={fps},"
+                "setsar=1"
+            )
+
+            if production_type == "video":
+                command = [
+                    binary,
+                    "-y",
+                    "-i",
+                    source_path,
+                    "-t",
+                    str(clip_seconds),
+                    "-vf",
+                    vf,
+                    "-an",
+                    "-c:v",
+                    codec,
+                    "-preset",
+                    preset,
+                    "-crf",
+                    crf,
+                    "-pix_fmt",
+                    "yuv420p",
+                    clip_path,
+                ]
+            else:
+                command = [
+                    binary,
+                    "-y",
+                    "-loop",
+                    "1",
+                    "-i",
+                    source_path,
+                    "-t",
+                    str(clip_seconds),
+                    "-vf",
+                    vf,
+                    "-an",
+                    "-c:v",
+                    codec,
+                    "-preset",
+                    preset,
+                    "-crf",
+                    crf,
+                    "-pix_fmt",
+                    "yuv420p",
+                    clip_path,
+                ]
+
+            proc = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+            )
+
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"FFmpeg failed preparing scene "
+                    f"{i + 1}: {proc.stderr[-2000:]}"
+                )
+
+            normalized_clips.append(clip_path)
+
+    concat_file = os.path.join(
+        scene_dir,
+        "concat.txt",
+    )
+
+    with open(concat_file, "w", encoding="utf-8") as f:
+        for clip_path in normalized_clips:
+            safe_path = clip_path.replace("'", "'\\''")
+            f.write(f"file '{safe_path}'\n")
+
+    silent_video = os.path.join(
+        render_dir,
+        "silent.mp4",
+    )
+
+    concat_command = [
+        binary,
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        concat_file,
+        "-c",
+        "copy",
+        silent_video,
+    ]
+
+    proc = subprocess.run(
+        concat_command,
+        capture_output=True,
+        text=True,
+    )
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"FFmpeg scene concatenation failed: "
+            f"{proc.stderr[-2000:]}"
+        )
+
+    final_path = os.path.join(
+        render_dir,
+        "final.mp4",
+    )
+
+    final_command = [
+        binary,
+        "-y",
+        "-i",
+        silent_video,
+        "-i",
+        voice_path,
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        "-c:v",
+        "copy",
+        "-c:a",
+        audio_codec,
+        "-shortest",
+        "-movflags",
+        "+faststart",
+        final_path,
+    ]
+
+    proc = subprocess.run(
+        final_command,
+        capture_output=True,
+        text=True,
+    )
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"FFmpeg final render failed: "
+            f"{proc.stderr[-2000:]}"
+        )
+
+    return {
+        "provider": "ffmpeg",
+        "status": "succeeded",
+        "path": final_path,
+        "project_id": project_id,
+        "width": width,
+        "height": height,
+        "fps": fps,
+    }
     
     def generate(self, **kwargs) -> dict[str, Any]:
         if self.kind == "video" and self.provider == "runway":
@@ -322,6 +556,9 @@ class GenericRealMediaProvider(MediaProvider):
         if self.kind == "voice" and self.provider == "elevenlabs":
             return self._elevenlabs(**kwargs)
 
+        if self.kind == "renderer" and self.provider == "ffmpeg":
+            return self._ffmpeg(**kwargs)
+            
         raise NotImplementedError(
             f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
             "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
