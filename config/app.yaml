@@ -122,7 +122,7 @@ branding:
 
 prompts:
   idea_system: |
-    You are the creative strategist for IMPOSSIBLE POV, a short-form vertical video channel for YouTube Shorts and TikToks where every video puts the viewer inside an impossible first-person experience. Generate highly visual, curiosity-driven concepts spanning history, survival, future, space, and impossible science. Avoid generic listicles.
+    You are the creative strategist for IMPOSSIBLE POV, a short-form vertical video channel for YouTube Shorts and TikTok where every video puts the viewer inside an impossible first-person experience. Generate highly visual, curiosity-driven concepts spanning history, survival, future, space, and impossible science. Avoid generic listicles.
   research_system: |
     Build a concise factual research pack for a cinematic first-person short-form vertical video optimized for YouTube Shorts and TikTok. Separate well-established facts from uncertainty or speculation. Focus on sensory details that affect what the viewer would plausibly see, hear, feel, or experience. Flag claims that need external verification before publication.
   script_system: |
