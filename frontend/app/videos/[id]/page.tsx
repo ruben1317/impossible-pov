@@ -22,7 +22,7 @@ export default function ProjectPage(){const params=useParams<{id:string}>();cons
 function Workflow({p,busy,act}:{p:any,busy:boolean,act:(path:string,body?:any)=>void}){
  if(p.stage==="idea")return <div className="stack"><p>Approve this concept before research or writing begins.</p><button className="btn primary" disabled={busy} onClick={()=>act("approve-idea")}>Approve Idea</button></div>;
  if(p.stage==="research"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("generate-script")}>Research + Generate Script</button>;
- if(p.stage==="script")return <div className="stack"><p>Review the full script below. No video generation has happened yet.</p><button className="btn primary" disabled={busy} onClick={()=>act("approve-script")}>Approve Script</button></div>;
+ if(p.stage==="script")return <ScriptReview p={p} busy={busy} act={act}/>;
  if(p.stage==="storyboard"&&p.status==="ready_to_generate")return <button className="btn primary" disabled={busy} onClick={()=>act("generate-storyboard")}>Generate Storyboard</button>;
  if(p.stage==="storyboard")return <p>Approve each storyboard scene below. All scenes must be approved before video generation.</p>;
  if(p.stage==="video_scenes"&&p.status==="ready_to_generate")return <div className="stack"><div className="notice">Economy mode: 3 Runway motion clips + 3 animated stills. Target scene-generation cost is about $0.87 before narration.</div><button className="btn primary" disabled={busy} onClick={()=>act("generate-video-scenes")}>Generate Video Scenes</button></div>;
