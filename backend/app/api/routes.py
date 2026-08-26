@@ -262,8 +262,23 @@ def publish(pid: int, req: PublishRequest, session: Session = Depends(get_sessio
     metadata = {
         "title": req.title or script.get("title") or p.title,
         "description": req.description or script.get("description") or "",
-        "privacy_status": req.privacy_status or get_effective_config(session).get("provider_options", {}).get("youtube", {}).get("privacy_status", "private"),
+        "privacy_status": (
+            req.privacy_status
+            or get_effective_config(session)
+            .get("provider_options", {})
+            .get("youtube", {})
+            .get("privacy_status", "private")
+        ),
         "scheduled_at": req.scheduled_at,
-        "altered_content_disclosure": get_effective_config(session).get("channel", {}).get("disclosure_altered_content", True),
+        "altered_content_disclosure": (
+            get_effective_config(session)
+            .get("channel", {})
+            .get("disclosure_altered_content", True)
+        ),
+        "platforms": req.platforms,
     }
-    return serialize(svc(session).publish(p, metadata))
+
+    try:
+        return serialize(svc(session).publish(p, metadata))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
