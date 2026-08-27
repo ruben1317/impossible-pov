@@ -3,7 +3,7 @@ import {useEffect,useState} from "react";
 import {useParams} from "next/navigation";
 import {api} from "@/lib/api";
 
-const steps=["idea","research","script","storyboard","video_scenes","voice","render","final","publish","published"];
+const steps=["idea","research","script","storyboard","voice","video_scenes","render","final","publish","published"];
 function fmtSeconds(value:number){const n=Math.max(0,Number(value)||0);const m=Math.floor(n/60);const sec=Math.floor(n%60);return `${m}:${String(sec).padStart(2,"0")}`;}
 export default function ProjectPage(){const params=useParams<{id:string}>();const id=params.id;const [p,setP]=useState<any>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
  async function refresh(){setP(await api(`/api/projects/${id}`))} useEffect(()=>{refresh().catch(e=>setError(String(e)))},[id]);
