@@ -563,3 +563,23 @@ def _ffmpeg(self, *, project_id: int, scenes: list, voice: dict):
             f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
             "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
         )
+GenericRealMediaProvider._ffmpeg = _ffmpeg
+
+
+def _real_media_generate(self, **kwargs):
+    if self.kind == "video" and self.provider == "runway":
+        return self._runway(**kwargs)
+
+    if self.kind == "voice" and self.provider == "elevenlabs":
+        return self._elevenlabs(**kwargs)
+
+    if self.kind == "renderer" and self.provider == "ffmpeg":
+        return self._ffmpeg(**kwargs)
+
+    raise NotImplementedError(
+        f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
+        "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
+    )
+
+
+GenericRealMediaProvider.generate = _real_media_generate
