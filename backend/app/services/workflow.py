@@ -166,7 +166,88 @@ class WorkflowService:
             p.stage = "voice"
         touch(p); self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p
+    def revise_storyboard_scene(
+        self,
+        p: Project,
+        idx: int,
+        instructions: str,
+    ):
+        instructions = (instructions or "").strip()
 
+        if not instructions:
+            raise ValueError(
+                "Scene revision instructions are required"
+            )
+
+        scenes = load(
+            p.storyboard_json,
+            [],
+        )
+
+        if not scenes:
+            raise ValueError(
+                "Generate a storyboard before editing a scene"
+            )
+
+        if idx < 0 or idx >= len(scenes):
+            raise ValueError(
+                "Invalid scene index"
+            )
+
+        script = load(
+            p.script_json,
+            {},
+        )
+
+        current_scene = scenes[idx]
+
+        revised_scene = (
+            self.providers.text()
+            .revise_storyboard_scene(
+                scene=current_scene,
+                instructions=instructions,
+                script=script,
+                config=self.config,
+            )
+        )
+
+        if not isinstance(revised_scene, dict):
+            raise RuntimeError(
+                "Storyboard scene revision returned invalid data"
+            )
+
+        revised_scene["index"] = int(
+            current_scene.get(
+                "index",
+                idx,
+            )
+        )
+
+        revised_scene["approved"] = False
+        revised_scene["notes"] = instructions
+
+        scenes[idx] = revised_scene
+
+        p.storyboard_json = dump(scenes)
+
+        # Editing a storyboard scene means the storyboard
+        # must be reviewed again before voice/video generation.
+        p.stage = "storyboard"
+        p.status = "needs_review"
+
+        # Any downstream generated assets are now stale.
+        p.scenes_json = "[]"
+        p.voice_json = "{}"
+        p.render_json = "{}"
+        p.publish_json = "{}"
+
+        touch(p)
+
+        self.session.add(p)
+        self.session.commit()
+        self.session.refresh(p)
+
+        return p
     def _scene_plan(self, board):
         opts = self.config.get("provider_options", {}).get("runway", {})
         motion = set(int(x) for x in opts.get("motion_scene_indexes", [0, 2, 4]))
