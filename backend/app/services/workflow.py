@@ -163,7 +163,7 @@ class WorkflowService:
         p.storyboard_json = dump(scenes)
         if scenes and all(x.get("approved") for x in scenes):
             p.status = "ready_to_generate"
-            p.stage = "video_scenes"
+            p.stage = "voice"
         touch(p); self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p
 
@@ -253,7 +253,10 @@ class WorkflowService:
         scenes = load(p.scenes_json, [])
         if not scenes or not all(s.get("video_approved") for s in scenes):
             raise ValueError("Approve every generated scene before continuing")
-        p.scenes_json = dump(scenes); p.stage = "voice"; p.status = "ready_to_generate"; touch(p)
+        p.scenes_json = dump(scenes)
+        p.stage = "render"
+        p.status = "ready_to_generate"
+        touch(p)
         self.session.add(p); self.session.commit(); self.session.refresh(p)
         return p
 
@@ -321,8 +324,12 @@ class WorkflowService:
         return p
 
     def approve_voice(self, p: Project):
-        p.stage = "render"; p.status = "ready_to_generate"; touch(p)
-        self.session.add(p); self.session.commit(); self.session.refresh(p)
+        p.stage = "video_scenes"
+        p.status = "ready_to_generate"
+        touch(p)
+        self.session.add(p)
+        self.session.commit()
+        self.session.refresh(p)
         return p
 
     def render(self, p: Project):
