@@ -60,8 +60,8 @@ storage:
     prefix: "impossible-pov"
 
 providers:
-  text: "mock"
-  research: "mock"
+  text: "openai"
+  research: "openai"
   image: "mock"
   video: "mock"
   voice: "mock"
