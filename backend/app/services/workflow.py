@@ -340,6 +340,15 @@ class WorkflowService:
             scenes=scenes,
             voice=voice,
         )
+        p.render_json = dump(result)
+        p.stage = "final"
+        p.status = "needs_review"
+        touch(p)
+
+        self.session.add(p)
+        self.session.commit()
+        self.session.refresh(p)
+        return p
 
     def approve_final(self, p: Project):
         p.stage = "publish"; p.status = "ready_to_publish"; touch(p)
