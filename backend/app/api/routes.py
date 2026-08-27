@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -367,13 +368,13 @@ def get_project(
     )
 
 
-@router.post("/projects/{pid}/approve-idea")
-def approve_idea(
+@router.post("/projects/{pid}/-idea")
+def _idea(
     pid: int,
     session: Session = Depends(get_session),
 ):
     return serialize(
-        svc(session).approve_idea(
+        svc(session)._idea(
             project_or_404(
                 session,
                 pid,
@@ -449,13 +450,13 @@ def revise_script(
         )
 
 
-@router.post("/projects/{pid}/approve-script")
-def approve_script(
+@router.post("/projects/{pid}/-script")
+def _script(
     pid: int,
     session: Session = Depends(get_session),
 ):
     return serialize(
-        svc(session).approve_script(
+        svc(session)._script(
             project_or_404(
                 session,
                 pid,
@@ -493,7 +494,7 @@ def scene_decision(
                     pid,
                 ),
                 req.scene_index,
-                req.approved,
+                req.d,
                 req.notes,
             )
         )
@@ -617,16 +618,16 @@ def regenerate_video_scene(
 
 
 @router.post(
-    "/projects/{pid}/approve-video-scene"
+    "/projects/{pid}/-video-scene"
 )
-def approve_video_scene(
+def _video_scene(
     pid: int,
     req: SceneVideoDecision,
     session: Session = Depends(get_session),
 ):
     try:
         return serialize(
-            svc(session).approve_video_scene(
+            svc(session)._video_scene(
                 project_or_404(
                     session,
                     pid,
@@ -643,14 +644,14 @@ def approve_video_scene(
 
 
 @router.post(
-    "/projects/{pid}/approve-video-scenes"
+    "/projects/{pid}/-video-scenes"
 )
-def approve_video(
+def _video(
     pid: int,
     session: Session = Depends(get_session),
 ):
     return serialize(
-        svc(session).approve_all_video_scenes(
+        svc(session)._all_video_scenes(
             project_or_404(
                 session,
                 pid,
@@ -679,7 +680,45 @@ def generate_voice(
             400,
             str(e),
         )
+        
+@router.get("/projects/{pid}/voice/audio")
+def voice_audio(
+    pid: int,
+    session: Session = Depends(get_session),
+):
+    p = project_or_404(
+        session,
+        pid,
+    )
 
+    try:
+        voice = json.loads(
+            p.voice_json or "{}"
+        )
+    except Exception:
+        voice = {}
+
+    path = str(
+        voice.get("path", "")
+    ).strip()
+
+    if not path:
+        raise HTTPException(
+            404,
+            "Narration has not been generated yet",
+        )
+
+    if not os.path.isfile(path):
+        raise HTTPException(
+            404,
+            "Narration audio file was not found",
+        )
+
+    return FileResponse(
+        path,
+        media_type="audio/mpeg",
+        filename=f"project-{pid}-narration.mp3",
+    )
 
 @router.post("/projects/{pid}/approve-voice")
 def approve_voice(
