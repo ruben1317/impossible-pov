@@ -101,6 +101,111 @@ class OpenAITextProvider(_OpenAIBase, TextProvider):
             scene["regenerations"] = 0
             scene.setdefault("preview_url", "")
         return scenes
+        
+    def revise_storyboard_scene(
+        self,
+        *,
+        scene: dict[str, Any],
+        instructions: str,
+        script: dict[str, Any],
+        config: dict[str, Any],
+    ):
+        system = config.get(
+            "prompts",
+            {},
+        ).get(
+            "scene_system",
+            "Create storyboard prompts.",
+        )
+
+        continuity = (
+            config.get("content", {})
+            .get("continuity_rules", [])
+        )
+
+        original_index = int(
+            scene.get("index", 0)
+        )
+
+        original_narration = str(
+            scene.get("narration", "")
+        )
+
+        revision_context = {
+            "scene_to_revise": scene,
+            "revision_instructions": instructions,
+            "full_script": script,
+            "continuity_rules": continuity,
+            "requirements": [
+                "Revise ONLY the supplied storyboard scene.",
+                "Do not create or return any other storyboard scenes.",
+                "Follow the user's revision instructions precisely.",
+                "Preserve the original narration unless the user explicitly asks to change the narration.",
+                "Preserve first-person POV.",
+                "Preserve visual continuity with the surrounding story.",
+                "Preserve recurring hands, sleeves, clothing, lighting, environment, scale, and camera perspective when applicable.",
+                "The prompt must be optimized for a vertical 9:16 cinematic AI-generated video.",
+                "Make spatial relationships physically understandable from the first-person camera position.",
+                "Avoid impossible camera geometry or describing objects behind the viewer as visible in front of the camera.",
+                "Avoid duplicated anatomy, duplicated limbs, duplicated teeth, malformed creatures, or contradictory physical descriptions.",
+                "Avoid readable AI-generated text, signs, captions, or lettering unless explicitly requested.",
+                "Keep the revised scene visually achievable by an AI image/video generation model.",
+            ],
+        }
+
+        user = (
+            "Revise exactly one storyboard scene.\n\n"
+            f"{json.dumps(revision_context, ensure_ascii=False)}\n\n"
+            "Return JSON using exactly this structure:\n"
+            '{"scene":{"narration":str,"prompt":str}}'
+        )
+
+        data, usage = self._json(
+            system,
+            user,
+        )
+
+        revised = data.get(
+            "scene",
+            data if isinstance(data, dict) else {},
+        )
+
+        if not isinstance(revised, dict):
+            raise RuntimeError(
+                "Storyboard scene revision returned invalid data"
+            )
+
+        prompt = str(
+            revised.get("prompt", "")
+        ).strip()
+
+        if not prompt:
+            raise RuntimeError(
+                "Storyboard scene revision returned an empty prompt"
+            )
+
+        narration = str(
+            revised.get(
+                "narration",
+                original_narration,
+            )
+        ).strip()
+
+        if not narration:
+            narration = original_narration
+
+        return {
+            **scene,
+            "index": original_index,
+            "narration": narration,
+            "prompt": prompt,
+            "approved": False,
+            "notes": "",
+            "regenerations": int(
+                scene.get("regenerations", 0)
+            ) + 1,
+            "preview_url": "",
+        }
 
 
 class OpenAIResearchProvider(_OpenAIBase, ResearchProvider):
