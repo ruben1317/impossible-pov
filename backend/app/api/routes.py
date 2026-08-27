@@ -4,6 +4,7 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from sqlmodel import Session, select
 
 from app.core.config import get_config
 from app.core.db import get_session
