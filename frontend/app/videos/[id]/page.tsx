@@ -2,7 +2,7 @@
 
 import {useEffect,useState} from "react";
 import {useParams} from "next/navigation";
-import {api} from "@/lib/api";
+import {API,api} from "@/lib/api";
 
 const steps=[
   "idea",
@@ -477,7 +477,7 @@ function Workflow({
       </p>
     );
   }
-
+  
   if(
     p.stage==="voice" &&
     p.status==="ready_to_generate"
@@ -488,20 +488,67 @@ function Workflow({
         disabled={busy}
         onClick={()=>act("generate-voice")}
       >
-        Generate Narration
+        {busy
+          ?"Generating Narration..."
+          :"Generate Narration"}
       </button>
     );
   }
-
+  
   if(p.stage==="voice"){
+    const voiceReady=
+      p.voice?.status==="succeeded" ||
+      Boolean(p.voice?.path);
+  
     return (
-      <button
-        className="btn primary"
-        disabled={busy}
-        onClick={()=>act("approve-voice")}
-      >
-        Approve Narration
-      </button>
+      <div className="stack">
+        {voiceReady&&(
+          <>
+            <div className="notice">
+              Narration generated successfully.
+              Listen to it before approving.
+            </div>
+  
+            <audio
+              controls
+              preload="metadata"
+              src={`${API}/api/projects/${p.id}/voice/audio`}
+              style={{
+                width:"100%",
+              }}
+            />
+  
+            <div className="muted">
+              Provider: {p.voice?.provider||"voice provider"}
+            </div>
+          </>
+        )}
+  
+        {!voiceReady&&(
+          <div className="notice">
+            Narration data was not found.
+            Generate the narration again before continuing.
+          </div>
+        )}
+  
+        <button
+          className="btn primary"
+          disabled={busy||!voiceReady}
+          onClick={()=>act("approve-voice")}
+        >
+          Approve Narration
+        </button>
+  
+        <button
+          className="btn"
+          disabled={busy}
+          onClick={()=>act("generate-voice")}
+        >
+          {busy
+            ?"Generating..."
+            :"↻ Regenerate Narration"}
+        </button>
+      </div>
     );
   }
 
