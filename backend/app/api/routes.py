@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from fastapi.responses import FileResponse
 
 from app.core.config import get_config
 from app.core.db import get_session
