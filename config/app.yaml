@@ -95,7 +95,7 @@ provider_options:
     output_format: "mp3_44100_128"
     estimated_cost_per_1000_chars: 0.10
   azure:
-    voice_name: "en-US-GuyNeutral"
+    voice_name: "en-US-GuyNeural"
     rate: "-15%"
     pitch: "0%"
   ffmpeg:
