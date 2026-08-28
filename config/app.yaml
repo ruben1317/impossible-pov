@@ -94,6 +94,10 @@ provider_options:
     model_id: "eleven_multilingual_v2"
     output_format: "mp3_44100_128"
     estimated_cost_per_1000_chars: 0.10
+  azure:
+    voice_name: "en-US-AndrewMultilingualNeural"
+    rate: "0%"
+    pitch: "0%"
   ffmpeg:
     binary: "ffmpeg"
     codec: "libx264"
