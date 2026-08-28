@@ -18,6 +18,8 @@ class EnvSettings(BaseSettings):
     openai_api_key: str | None = None
     runway_api_key: str | None = None
     elevenlabs_api_key: str | None = None
+    azure_speech_key: str = ""
+    azure_speech_region: str = "eastus"
     youtube_client_id: str | None = None
     youtube_client_secret: str | None = None
     youtube_refresh_token: str | None = None
