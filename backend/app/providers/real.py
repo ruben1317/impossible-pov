@@ -722,6 +722,46 @@ class GenericRealMediaProvider(MediaProvider):
             f"https://{region}.tts.speech.microsoft.com/"
             "cognitiveservices/v1"
         )
+        
+        voices_endpoint = (
+            f"https://{region}.tts.speech.microsoft.com/"
+            "cognitiveservices/voices/list"
+        )
+
+        with httpx.Client(timeout=30) as client:
+            voices_response = client.get(
+                voices_endpoint,
+                headers={
+                    "Ocp-Apim-Subscription-Key": key,
+                },
+            )
+
+        if voices_response.is_error:
+            raise RuntimeError(
+                "Azure voice-list check failed. "
+                f"HTTP={voices_response.status_code} "
+                f"body={(voices_response.text or '[empty]')[:1500]}"
+            )
+
+        available_voices = {
+            item.get("ShortName")
+            for item in voices_response.json()
+            if item.get("ShortName")
+        }
+
+        if voice_name not in available_voices:
+            guy_matches = sorted(
+                name
+                for name in available_voices
+                if "Guy" in name
+            )
+
+            raise RuntimeError(
+                f"Azure voice '{voice_name}' is not available "
+                f"for this Speech resource in region '{region}'. "
+                f"Guy matches={guy_matches}. "
+                f"Total voices={len(available_voices)}"
+            )
 
         escaped_text = (
             text
