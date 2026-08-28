@@ -668,6 +668,160 @@ class GenericRealMediaProvider(MediaProvider):
             "project_id": project_id,
         }
 
+    def _azure(
+        self,
+        *,
+        text: str,
+        project_id: int,
+    ):
+        import os
+
+        env = get_env()
+
+        key = env.azure_speech_key
+        region = env.azure_speech_region
+
+        if not key:
+            raise RuntimeError(
+                "AZURE_SPEECH_KEY is not configured"
+            )
+
+        if not region:
+            raise RuntimeError(
+                "AZURE_SPEECH_REGION is not configured"
+            )
+
+        opts = (
+            self.config
+            .get("provider_options", {})
+            .get("azure", {})
+        )
+
+        voice_name = str(
+            opts.get(
+                "voice_name",
+                "en-US-AndrewMultilingualNeural",
+            )
+        ).strip()
+
+        rate = str(
+            opts.get(
+                "rate",
+                "0%",
+            )
+        ).strip()
+
+        pitch = str(
+            opts.get(
+                "pitch",
+                "0%",
+            )
+        ).strip()
+
+        endpoint = (
+            f"https://{region}.tts.speech.microsoft.com/"
+            "cognitiveservices/v1"
+        )
+
+        escaped_text = (
+            text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&apos;")
+        )
+
+        ssml = (
+            "<speak version='1.0' "
+            "xmlns='http://www.w3.org/2001/10/synthesis' "
+            "xml:lang='en-US'>"
+            f"<voice name='{voice_name}'>"
+            f"<prosody rate='{rate}' pitch='{pitch}'>"
+            f"{escaped_text}"
+            "</prosody>"
+            "</voice>"
+            "</speak>"
+        )
+
+        headers = {
+            "Ocp-Apim-Subscription-Key": key,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
+            "User-Agent": "impossible-pov",
+        }
+
+        with httpx.Client(
+            timeout=90
+        ) as client:
+            response = client.post(
+                endpoint,
+                headers=headers,
+                content=ssml.encode("utf-8"),
+            )
+
+        if response.is_error:
+            detail = (
+                response.text or ""
+            ).strip()
+
+            if len(detail) > 1200:
+                detail = (
+                    detail[:1200]
+                    + "…"
+                )
+
+            raise RuntimeError(
+                "Azure text-to-speech "
+                f"failed with HTTP "
+                f"{response.status_code}: "
+                f"{detail or response.reason_phrase}"
+            )
+
+        base_path = (
+            self.config
+            .get("storage", {})
+            .get("local", {})
+            .get(
+                "base_path",
+                "./storage",
+            )
+        )
+
+        voice_dir = os.path.join(
+            base_path,
+            "projects",
+            str(project_id),
+            "voice",
+        )
+
+        os.makedirs(
+            voice_dir,
+            exist_ok=True,
+        )
+
+        audio_path = os.path.join(
+            voice_dir,
+            "narration.mp3",
+        )
+
+        with open(
+            audio_path,
+            "wb",
+        ) as f:
+            f.write(
+                response.content
+            )
+
+        return {
+            "provider": "azure",
+            "status": "succeeded",
+            "path": audio_path,
+            "cost": 0.0,
+            "project_id": project_id,
+            "voice_name": voice_name,
+        }
+        
     def _ffmpeg(
         self,
         *,
