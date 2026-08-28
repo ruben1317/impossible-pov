@@ -227,122 +227,348 @@ class GenericRealMediaProvider(MediaProvider):
     def _runway_prompt(prompt: str, limit: int = 950) -> str:
         """Keep Runway promptText safely below the API's 1000 UTF-16-unit limit."""
         text = " ".join(str(prompt or "").split())
+
         if not text:
             return "Cinematic first-person POV scene."
+
         out = []
         units = 0
+
         for ch in text:
             u = len(ch.encode("utf-16-le")) // 2
+
             if units + u > limit:
                 break
+
             out.append(ch)
             units += u
+
         clipped = "".join(out).rstrip()
+
         if len(clipped) < len(text):
-            clipped = clipped.rsplit(" ", 1)[0].rstrip(" ,;:-") + "."
+            clipped = (
+                clipped
+                .rsplit(" ", 1)[0]
+                .rstrip(" ,;:-")
+                + "."
+            )
+
         return clipped
 
     @staticmethod
-    def _runway_error(endpoint: str, response: httpx.Response) -> RuntimeError:
+    def _runway_error(
+        endpoint: str,
+        response: httpx.Response,
+    ) -> RuntimeError:
         try:
             body = response.json()
-            detail = json.dumps(body, ensure_ascii=False)
+            detail = json.dumps(
+                body,
+                ensure_ascii=False,
+            )
         except Exception:
-            detail = (response.text or "").strip()
+            detail = (
+                response.text or ""
+            ).strip()
+
         if len(detail) > 1200:
             detail = detail[:1200] + "…"
+
         return RuntimeError(
-            f"Runway {endpoint} failed with HTTP {response.status_code}: "
+            f"Runway {endpoint} failed with HTTP "
+            f"{response.status_code}: "
             f"{detail or response.reason_phrase}"
         )
 
-    def _runway(self, *, prompt: str, scene_index: int, project_id: int, motion: bool = True):
+    def _runway(
+        self,
+        *,
+        prompt: str,
+        scene_index: int,
+        project_id: int,
+        motion: bool = True,
+    ):
         import time
+
         key = get_env().runway_api_key
+
         if not key:
-            raise RuntimeError("RUNWAY_API_KEY is not configured")
-        opts = self.config.get("provider_options", {}).get("runway", {})
-        headers = {"Authorization": f"Bearer {key}", "X-Runway-Version": "2024-11-06", "Content-Type": "application/json"}
+            raise RuntimeError(
+                "RUNWAY_API_KEY is not configured"
+            )
+
+        opts = (
+            self.config
+            .get("provider_options", {})
+            .get("runway", {})
+        )
+
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "X-Runway-Version": "2024-11-06",
+            "Content-Type": "application/json",
+        }
+
         base = "https://api.dev.runwayml.com/v1"
         ratio = "720:1280"
-        image_model = opts.get("image_model", "gen4_image_turbo")
-        video_model = "gen4_turbo" if opts.get("production_mode") == "economy_hybrid" else opts.get("model", "gen4_turbo")
-        duration = int(opts.get("clip_seconds", 5))
-        timeout = float(opts.get("max_poll_minutes", 10)) * 60
-        safe_prompt = self._runway_prompt(prompt)
 
-        def checked(response: httpx.Response, endpoint: str):
+        image_model = opts.get(
+            "image_model",
+            "gen4_image_turbo",
+        )
+
+        video_model = (
+            "gen4_turbo"
+            if opts.get("production_mode")
+            == "economy_hybrid"
+            else opts.get(
+                "model",
+                "gen4_turbo",
+            )
+        )
+
+        duration = int(
+            opts.get(
+                "clip_seconds",
+                5,
+            )
+        )
+
+        timeout = (
+            float(
+                opts.get(
+                    "max_poll_minutes",
+                    10,
+                )
+            )
+            * 60
+        )
+
+        safe_prompt = self._runway_prompt(
+            prompt
+        )
+
+        def checked(
+            response: httpx.Response,
+            endpoint: str,
+        ):
             if response.is_error:
-                raise self._runway_error(endpoint, response)
+                raise self._runway_error(
+                    endpoint,
+                    response,
+                )
+
             try:
                 return response.json()
             except Exception as exc:
-                raise RuntimeError(f"Runway {endpoint} returned invalid JSON: {response.text[:500]}") from exc
+                raise RuntimeError(
+                    f"Runway {endpoint} returned "
+                    f"invalid JSON: "
+                    f"{response.text[:500]}"
+                ) from exc
 
-        def wait(task_id: str, task_kind: str):
+        def wait(
+            task_id: str,
+            task_kind: str,
+        ):
             deadline = time.time() + timeout
-            with httpx.Client(timeout=60) as client:
+
+            with httpx.Client(
+                timeout=60
+            ) as client:
                 while time.time() < deadline:
-                    data = checked(client.get(f"{base}/tasks/{task_id}", headers=headers), f"task status ({task_kind})")
+                    data = checked(
+                        client.get(
+                            f"{base}/tasks/{task_id}",
+                            headers=headers,
+                        ),
+                        f"task status ({task_kind})",
+                    )
+
                     status = data.get("status")
+
                     if status == "SUCCEEDED":
                         if not data.get("output"):
-                            raise RuntimeError(f"Runway {task_kind} task succeeded but returned no output: {json.dumps(data)[:800]}")
-                        return data
-                    if status in ("FAILED", "CANCELED"):
-                        failure = data.get("failure") or data.get("failureCode") or data
-                        raise RuntimeError(f"Runway {task_kind} task {status}: {failure}")
-                    time.sleep(float(opts.get("polling_interval_seconds", 5)))
-            raise TimeoutError(f"Runway {task_kind} generation timed out after {int(timeout)} seconds")
+                            raise RuntimeError(
+                                f"Runway {task_kind} task "
+                                f"succeeded but returned no output: "
+                                f"{json.dumps(data)[:800]}"
+                            )
 
-        with httpx.Client(timeout=90) as client:
+                        return data
+
+                    if status in (
+                        "FAILED",
+                        "CANCELED",
+                    ):
+                        failure = (
+                            data.get("failure")
+                            or data.get("failureCode")
+                            or data
+                        )
+
+                        raise RuntimeError(
+                            f"Runway {task_kind} task "
+                            f"{status}: {failure}"
+                        )
+
+                    time.sleep(
+                        float(
+                            opts.get(
+                                "polling_interval_seconds",
+                                5,
+                            )
+                        )
+                    )
+
+            raise TimeoutError(
+                f"Runway {task_kind} generation "
+                f"timed out after "
+                f"{int(timeout)} seconds"
+            )
+
+        with httpx.Client(
+            timeout=90
+        ) as client:
             image_data = checked(
                 client.post(
                     f"{base}/text_to_image",
                     headers=headers,
-                    json={"model": image_model, "promptText": safe_prompt, "ratio": ratio},
+                    json={
+                        "model": image_model,
+                        "promptText": safe_prompt,
+                        "ratio": ratio,
+                    },
                 ),
                 "text_to_image",
             )
-            image_task = wait(image_data["id"], "image")
-            image_url = image_task["output"][0]
-            image_cost = float(opts.get("image_cost", 0.02))
+
+            image_task = wait(
+                image_data["id"],
+                "image",
+            )
+
+            image_url = (
+                image_task["output"][0]
+            )
+
+            image_cost = float(
+                opts.get(
+                    "image_cost",
+                    0.02,
+                )
+            )
+
             if not motion:
-                return {"provider":"runway","status":"succeeded","asset_type":"animated_still","image_url":image_url,"url":image_url,"cost":image_cost,"scene_index":scene_index,"project_id":project_id}
+                return {
+                    "provider": "runway",
+                    "status": "succeeded",
+                    "asset_type": "animated_still",
+                    "image_url": image_url,
+                    "url": image_url,
+                    "cost": image_cost,
+                    "scene_index": scene_index,
+                    "project_id": project_id,
+                }
 
             video_data = checked(
                 client.post(
                     f"{base}/image_to_video",
                     headers=headers,
-                    json={"model": video_model, "promptImage": image_url, "promptText": safe_prompt, "duration": duration, "ratio": ratio},
+                    json={
+                        "model": video_model,
+                        "promptImage": image_url,
+                        "promptText": safe_prompt,
+                        "duration": duration,
+                        "ratio": ratio,
+                    },
                 ),
                 "image_to_video",
             )
-            video_task = wait(video_data["id"], "video")
-            video_url = video_task["output"][0]
-            cost = image_cost + duration * float(opts.get("estimated_cost_per_second", 0.05))
-            return {"provider":"runway","status":"succeeded","asset_type":"video","image_url":image_url,"url":video_url,"cost":round(cost,4),"scene_index":scene_index,"project_id":project_id}
 
-    def _elevenlabs(self, *, text: str, project_id: int):
+            video_task = wait(
+                video_data["id"],
+                "video",
+            )
+
+            video_url = (
+                video_task["output"][0]
+            )
+
+            cost = (
+                image_cost
+                + duration
+                * float(
+                    opts.get(
+                        "estimated_cost_per_second",
+                        0.05,
+                    )
+                )
+            )
+
+            return {
+                "provider": "runway",
+                "status": "succeeded",
+                "asset_type": "video",
+                "image_url": image_url,
+                "url": video_url,
+                "cost": round(
+                    cost,
+                    4,
+                ),
+                "scene_index": scene_index,
+                "project_id": project_id,
+            }
+
+    def _elevenlabs(
+        self,
+        *,
+        text: str,
+        project_id: int,
+    ):
         key = get_env().elevenlabs_api_key
-        if not key:
-            raise RuntimeError("ELEVENLABS_API_KEY is not configured")
 
-        opts = self.config.get("provider_options", {}).get("elevenlabs", {})
-        voice_id = str(opts.get("voice_id", "")).strip()
-        model_id = str(
-            opts.get("model_id", "eleven_multilingual_v2")
+        if not key:
+            raise RuntimeError(
+                "ELEVENLABS_API_KEY is not configured"
+            )
+
+        opts = (
+            self.config
+            .get("provider_options", {})
+            .get("elevenlabs", {})
+        )
+
+        voice_id = str(
+            opts.get(
+                "voice_id",
+                "",
+            )
         ).strip()
+
+        model_id = str(
+            opts.get(
+                "model_id",
+                "eleven_multilingual_v2",
+            )
+        ).strip()
+
         output_format = str(
-            opts.get("output_format", "mp3_44100_128")
+            opts.get(
+                "output_format",
+                "mp3_44100_128",
+            )
         ).strip()
 
         if not voice_id:
-            raise RuntimeError("ElevenLabs voice_id is not configured")
+            raise RuntimeError(
+                "ElevenLabs voice_id is not configured"
+            )
 
         url = (
-            f"https://api.elevenlabs.io/v1/text-to-speech/"
-            f"{voice_id}?output_format={output_format}"
+            "https://api.elevenlabs.io/v1/"
+            f"text-to-speech/{voice_id}"
+            f"?output_format={output_format}"
         )
 
         payload = {
@@ -356,7 +582,9 @@ class GenericRealMediaProvider(MediaProvider):
             "Accept": "audio/mpeg",
         }
 
-        with httpx.Client(timeout=90) as client:
+        with httpx.Client(
+            timeout=90
+        ) as client:
             response = client.post(
                 url,
                 headers=headers,
@@ -364,13 +592,19 @@ class GenericRealMediaProvider(MediaProvider):
             )
 
         if response.is_error:
-            detail = (response.text or "").strip()
+            detail = (
+                response.text or ""
+            ).strip()
 
             if len(detail) > 1200:
-                detail = detail[:1200] + "…"
+                detail = (
+                    detail[:1200]
+                    + "…"
+                )
 
             raise RuntimeError(
-                f"ElevenLabs text-to-speech failed with HTTP "
+                "ElevenLabs text-to-speech "
+                f"failed with HTTP "
                 f"{response.status_code}: "
                 f"{detail or response.reason_phrase}"
             )
@@ -378,9 +612,13 @@ class GenericRealMediaProvider(MediaProvider):
         import os
 
         base_path = (
-            self.config.get("storage", {})
+            self.config
+            .get("storage", {})
             .get("local", {})
-            .get("base_path", "./storage")
+            .get(
+                "base_path",
+                "./storage",
+            )
         )
 
         voice_dir = os.path.join(
@@ -390,15 +628,23 @@ class GenericRealMediaProvider(MediaProvider):
             "voice",
         )
 
-        os.makedirs(voice_dir, exist_ok=True)
+        os.makedirs(
+            voice_dir,
+            exist_ok=True,
+        )
 
         audio_path = os.path.join(
             voice_dir,
             "narration.mp3",
         )
 
-        with open(audio_path, "wb") as f:
-            f.write(response.content)
+        with open(
+            audio_path,
+            "wb",
+        ) as f:
+            f.write(
+                response.content
+            )
 
         per_k = float(
             opts.get(
@@ -408,7 +654,9 @@ class GenericRealMediaProvider(MediaProvider):
         )
 
         cost = round(
-            len(text) / 1000.0 * per_k,
+            len(text)
+            / 1000.0
+            * per_k,
             4,
         )
 
@@ -419,272 +667,421 @@ class GenericRealMediaProvider(MediaProvider):
             "cost": cost,
             "project_id": project_id,
         }
-        
-def _ffmpeg(self, *, project_id: int, scenes: list, voice: dict):
-    import os
-    import subprocess
 
-    opts = self.config.get("provider_options", {}).get("ffmpeg", {})
-    vd = self.config.get("video_defaults", {})
+    def _ffmpeg(
+        self,
+        *,
+        project_id: int,
+        scenes: list,
+        voice: dict,
+    ):
+        import os
+        import subprocess
 
-    binary = str(opts.get("binary", "ffmpeg"))
-    codec = str(opts.get("codec", "libx264"))
-    audio_codec = str(opts.get("audio_codec", "aac"))
-    preset = str(opts.get("preset", "medium"))
-    crf = str(opts.get("crf", 18))
-
-    width = int(vd.get("width", 1080))
-    height = int(vd.get("height", 1920))
-    fps = int(vd.get("fps", 30))
-    clip_seconds = float(vd.get("clip_seconds", 5))
-
-    base_path = (
-        self.config.get("storage", {})
-        .get("local", {})
-        .get("base_path", "./storage")
-    )
-
-    project_dir = os.path.join(
-        base_path,
-        "projects",
-        str(project_id),
-    )
-
-    render_dir = os.path.join(project_dir, "render")
-    scene_dir = os.path.join(project_dir, "render_scenes")
-
-    os.makedirs(render_dir, exist_ok=True)
-    os.makedirs(scene_dir, exist_ok=True)
-
-    voice_path = str(voice.get("path", "")).strip()
-
-    if not voice_path or not os.path.exists(voice_path):
-        raise RuntimeError(
-            f"Narration file not found: {voice_path}"
+        opts = (
+            self.config
+            .get("provider_options", {})
+            .get("ffmpeg", {})
         )
 
-    normalized_clips = []
+        vd = self.config.get(
+            "video_defaults",
+            {},
+        )
 
-    with httpx.Client(timeout=120, follow_redirects=True) as client:
-        for i, scene in enumerate(scenes):
-            video = scene.get("video") or {}
-            source_url = str(video.get("url", "")).strip()
+        binary = str(
+            opts.get(
+                "binary",
+                "ffmpeg",
+            )
+        )
 
-            if not source_url:
-                raise RuntimeError(
-                    f"Scene {i + 1} has no generated media URL"
+        codec = str(
+            opts.get(
+                "codec",
+                "libx264",
+            )
+        )
+
+        audio_codec = str(
+            opts.get(
+                "audio_codec",
+                "aac",
+            )
+        )
+
+        preset = str(
+            opts.get(
+                "preset",
+                "medium",
+            )
+        )
+
+        crf = str(
+            opts.get(
+                "crf",
+                18,
+            )
+        )
+
+        width = int(
+            vd.get(
+                "width",
+                1080,
+            )
+        )
+
+        height = int(
+            vd.get(
+                "height",
+                1920,
+            )
+        )
+
+        fps = int(
+            vd.get(
+                "fps",
+                30,
+            )
+        )
+
+        clip_seconds = float(
+            vd.get(
+                "clip_seconds",
+                5,
+            )
+        )
+
+        base_path = (
+            self.config
+            .get("storage", {})
+            .get("local", {})
+            .get(
+                "base_path",
+                "./storage",
+            )
+        )
+
+        project_dir = os.path.join(
+            base_path,
+            "projects",
+            str(project_id),
+        )
+
+        render_dir = os.path.join(
+            project_dir,
+            "render",
+        )
+
+        scene_dir = os.path.join(
+            project_dir,
+            "render_scenes",
+        )
+
+        os.makedirs(
+            render_dir,
+            exist_ok=True,
+        )
+
+        os.makedirs(
+            scene_dir,
+            exist_ok=True,
+        )
+
+        voice_path = str(
+            voice.get(
+                "path",
+                "",
+            )
+        ).strip()
+
+        if (
+            not voice_path
+            or not os.path.exists(
+                voice_path
+            )
+        ):
+            raise RuntimeError(
+                f"Narration file not found: "
+                f"{voice_path}"
+            )
+
+        normalized_clips = []
+
+        with httpx.Client(
+            timeout=120,
+            follow_redirects=True,
+        ) as client:
+            for i, scene in enumerate(
+                scenes
+            ):
+                video = (
+                    scene.get("video")
+                    or {}
                 )
 
-            production_type = scene.get(
-                "production_type",
-                "video",
-            )
+                source_url = str(
+                    video.get(
+                        "url",
+                        "",
+                    )
+                ).strip()
 
-            ext = ".mp4" if production_type == "video" else ".jpg"
+                if not source_url:
+                    raise RuntimeError(
+                        f"Scene {i + 1} has "
+                        f"no generated media URL"
+                    )
 
-            source_path = os.path.join(
-                scene_dir,
-                f"source_{i:02d}{ext}",
-            )
-
-            response = client.get(source_url)
-            response.raise_for_status()
-
-            with open(source_path, "wb") as f:
-                f.write(response.content)
-
-            clip_path = os.path.join(
-                scene_dir,
-                f"clip_{i:02d}.mp4",
-            )
-
-            vf = (
-                f"scale={width}:{height}:"
-                "force_original_aspect_ratio=increase,"
-                f"crop={width}:{height},"
-                f"fps={fps},"
-                "setsar=1"
-            )
-
-            if production_type == "video":
-                command = [
-                    binary,
-                    "-y",
-                    "-i",
-                    source_path,
-                    "-t",
-                    str(clip_seconds),
-                    "-vf",
-                    vf,
-                    "-an",
-                    "-c:v",
-                    codec,
-                    "-preset",
-                    preset,
-                    "-crf",
-                    crf,
-                    "-pix_fmt",
-                    "yuv420p",
-                    clip_path,
-                ]
-            else:
-                command = [
-                    binary,
-                    "-y",
-                    "-loop",
-                    "1",
-                    "-i",
-                    source_path,
-                    "-t",
-                    str(clip_seconds),
-                    "-vf",
-                    vf,
-                    "-an",
-                    "-c:v",
-                    codec,
-                    "-preset",
-                    preset,
-                    "-crf",
-                    crf,
-                    "-pix_fmt",
-                    "yuv420p",
-                    clip_path,
-                ]
-
-            proc = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-            )
-
-            if proc.returncode != 0:
-                raise RuntimeError(
-                    f"FFmpeg failed preparing scene "
-                    f"{i + 1}: {proc.stderr[-2000:]}"
+                production_type = (
+                    scene.get(
+                        "production_type",
+                        "video",
+                    )
                 )
 
-            normalized_clips.append(clip_path)
+                ext = (
+                    ".mp4"
+                    if production_type
+                    == "video"
+                    else ".jpg"
+                )
 
-    concat_file = os.path.join(
-        scene_dir,
-        "concat.txt",
-    )
+                source_path = os.path.join(
+                    scene_dir,
+                    f"source_{i:02d}{ext}",
+                )
 
-    with open(concat_file, "w", encoding="utf-8") as f:
-        for clip_path in normalized_clips:
-            safe_path = clip_path.replace("'", "'\\''")
-            f.write(f"file '{safe_path}'\n")
+                response = client.get(
+                    source_url
+                )
 
-    silent_video = os.path.join(
-        render_dir,
-        "silent.mp4",
-    )
+                response.raise_for_status()
 
-    concat_command = [
-        binary,
-        "-y",
-        "-f",
-        "concat",
-        "-safe",
-        "0",
-        "-i",
-        concat_file,
-        "-c",
-        "copy",
-        silent_video,
-    ]
+                with open(
+                    source_path,
+                    "wb",
+                ) as f:
+                    f.write(
+                        response.content
+                    )
 
-    proc = subprocess.run(
-        concat_command,
-        capture_output=True,
-        text=True,
-    )
+                clip_path = os.path.join(
+                    scene_dir,
+                    f"clip_{i:02d}.mp4",
+                )
 
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"FFmpeg scene concatenation failed: "
-            f"{proc.stderr[-2000:]}"
+                vf = (
+                    f"scale={width}:{height}:"
+                    "force_original_aspect_ratio="
+                    "increase,"
+                    f"crop={width}:{height},"
+                    f"fps={fps},"
+                    "setsar=1"
+                )
+
+                if production_type == "video":
+                    command = [
+                        binary,
+                        "-y",
+                        "-i",
+                        source_path,
+                        "-t",
+                        str(
+                            clip_seconds
+                        ),
+                        "-vf",
+                        vf,
+                        "-an",
+                        "-c:v",
+                        codec,
+                        "-preset",
+                        preset,
+                        "-crf",
+                        crf,
+                        "-pix_fmt",
+                        "yuv420p",
+                        clip_path,
+                    ]
+
+                else:
+                    command = [
+                        binary,
+                        "-y",
+                        "-loop",
+                        "1",
+                        "-i",
+                        source_path,
+                        "-t",
+                        str(
+                            clip_seconds
+                        ),
+                        "-vf",
+                        vf,
+                        "-an",
+                        "-c:v",
+                        codec,
+                        "-preset",
+                        preset,
+                        "-crf",
+                        crf,
+                        "-pix_fmt",
+                        "yuv420p",
+                        clip_path,
+                    ]
+
+                proc = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                )
+
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        "FFmpeg failed preparing "
+                        f"scene {i + 1}: "
+                        f"{proc.stderr[-2000:]}"
+                    )
+
+                normalized_clips.append(
+                    clip_path
+                )
+
+        concat_file = os.path.join(
+            scene_dir,
+            "concat.txt",
         )
 
-    final_path = os.path.join(
-        render_dir,
-        "final.mp4",
-    )
+        with open(
+            concat_file,
+            "w",
+            encoding="utf-8",
+        ) as f:
+            for clip_path in normalized_clips:
+                safe_path = (
+                    clip_path.replace(
+                        "'",
+                        "'\\''",
+                    )
+                )
 
-    final_command = [
-        binary,
-        "-y",
-        "-i",
-        silent_video,
-        "-i",
-        voice_path,
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c:v",
-        "copy",
-        "-c:a",
-        audio_codec,
-        "-shortest",
-        "-movflags",
-        "+faststart",
-        final_path,
-    ]
+                f.write(
+                    f"file '{safe_path}'\n"
+                )
 
-    proc = subprocess.run(
-        final_command,
-        capture_output=True,
-        text=True,
-    )
-
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"FFmpeg final render failed: "
-            f"{proc.stderr[-2000:]}"
+        silent_video = os.path.join(
+            render_dir,
+            "silent.mp4",
         )
 
-    return {
-        "provider": "ffmpeg",
-        "status": "succeeded",
-        "path": final_path,
-        "project_id": project_id,
-        "width": width,
-        "height": height,
-        "fps": fps,
-    }
-    
-    def generate(self, **kwargs) -> dict[str, Any]:
-        if self.kind == "video" and self.provider == "runway":
-            return self._runway(**kwargs)
+        concat_command = [
+            binary,
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concat_file,
+            "-c",
+            "copy",
+            silent_video,
+        ]
 
-        if self.kind == "voice" and self.provider == "elevenlabs":
-            return self._elevenlabs(**kwargs)
+        proc = subprocess.run(
+            concat_command,
+            capture_output=True,
+            text=True,
+        )
 
-        if self.kind == "renderer" and self.provider == "ffmpeg":
-            return self._ffmpeg(**kwargs)
-            
+        if proc.returncode != 0:
+            raise RuntimeError(
+                "FFmpeg scene concatenation "
+                f"failed: "
+                f"{proc.stderr[-2000:]}"
+            )
+
+        final_path = os.path.join(
+            render_dir,
+            "final.mp4",
+        )
+
+        final_command = [
+            binary,
+            "-y",
+            "-i",
+            silent_video,
+            "-i",
+            voice_path,
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            audio_codec,
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            final_path,
+        ]
+
+        proc = subprocess.run(
+            final_command,
+            capture_output=True,
+            text=True,
+        )
+
+        if proc.returncode != 0:
+            raise RuntimeError(
+                "FFmpeg final render failed: "
+                f"{proc.stderr[-2000:]}"
+            )
+
+        return {
+            "provider": "ffmpeg",
+            "status": "succeeded",
+            "path": final_path,
+            "project_id": project_id,
+            "width": width,
+            "height": height,
+            "fps": fps,
+        }
+
+    def generate(
+        self,
+        **kwargs,
+    ) -> dict[str, Any]:
+        if (
+            self.kind == "video"
+            and self.provider == "runway"
+        ):
+            return self._runway(
+                **kwargs
+            )
+
+        if (
+            self.kind == "voice"
+            and self.provider == "elevenlabs"
+        ):
+            return self._elevenlabs(
+                **kwargs
+            )
+
+        if (
+            self.kind == "renderer"
+            and self.provider == "ffmpeg"
+        ):
+            return self._ffmpeg(
+                **kwargs
+            )
+
         raise NotImplementedError(
-            f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
-            "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
+            f"Live adapter for {self.kind} "
+            f"provider '{self.provider}' "
+            "is not wired yet. "
+            "Credentials belong in environment "
+            "variables and behavior/model settings "
+            "belong in config/app.yaml."
         )
-GenericRealMediaProvider._ffmpeg = _ffmpeg
-
-
-def _real_media_generate(self, **kwargs):
-    if self.kind == "video" and self.provider == "runway":
-        return self._runway(**kwargs)
-
-    if self.kind == "voice" and self.provider == "elevenlabs":
-        return self._elevenlabs(**kwargs)
-
-    if self.kind == "renderer" and self.provider == "ffmpeg":
-        return self._ffmpeg(**kwargs)
-
-    raise NotImplementedError(
-        f"Live adapter for {self.kind} provider '{self.provider}' is not wired yet. "
-        "Credentials belong in environment variables and behavior/model settings belong in config/app.yaml."
-    )
-
-
-GenericRealMediaProvider.generate = _real_media_generate
