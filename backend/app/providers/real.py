@@ -735,11 +735,16 @@ class GenericRealMediaProvider(MediaProvider):
         ssml = (
             "<speak version='1.0' "
             "xmlns='http://www.w3.org/2001/10/synthesis' "
+            "xmlns:mstts='https://www.w3.org/2001/mstts' "
             "xml:lang='en-US'>"
             f"<voice name='{voice_name}'>"
+            "<mstts:express-as "
+            "style='terrified' "
+            "styledegree='1.25'>"
             f"<prosody rate='{rate}' pitch='{pitch}'>"
             f"{escaped_text}"
             "</prosody>"
+            "</mstts:express-as>"
             "</voice>"
             "</speak>"
         )
