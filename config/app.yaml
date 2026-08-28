@@ -96,7 +96,7 @@ provider_options:
     estimated_cost_per_1000_chars: 0.10
   azure:
     voice_name: "en-US-AndrewMultilingualNeural"
-    rate: "-15%"
+    rate: "-20%"
     pitch: "0%"
   ffmpeg:
     binary: "ffmpeg"
