@@ -1224,6 +1224,14 @@ class GenericRealMediaProvider(MediaProvider):
             )
 
         if (
+            self.kind == "voice"
+            and self.provider == "azure"
+        ):
+            return self._azure(
+                **kwargs
+            )
+            
+        if (
             self.kind == "renderer"
             and self.provider == "ffmpeg"
         ):
