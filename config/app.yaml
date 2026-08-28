@@ -64,7 +64,7 @@ providers:
   research: "openai"
   image: "mock"
   video: "mock"
-  voice: "mock"
+  voice: "azure"
   renderer: "mock"
   publisher: "mock"
 
