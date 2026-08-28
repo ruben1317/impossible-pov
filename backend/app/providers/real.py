@@ -764,21 +764,32 @@ class GenericRealMediaProvider(MediaProvider):
             )
 
         if response.is_error:
-            detail = (
-                response.text or ""
-            ).strip()
+            detail = (response.text or "").strip()
 
-            if len(detail) > 1200:
-                detail = (
-                    detail[:1200]
-                    + "…"
-                )
+            request_id = (
+                response.headers.get("X-MSEdge-Ref")
+                or response.headers.get("X-RequestId")
+                or response.headers.get("apim-request-id")
+                or "none"
+            )
+
+            content_type = response.headers.get(
+                "content-type",
+                "unknown"
+            )
+
+            raw_preview = repr(response.content[:1000])
 
             raise RuntimeError(
-                "Azure text-to-speech "
-                f"failed with HTTP "
-                f"{response.status_code}: "
-                f"{detail or response.reason_phrase}"
+                "Azure text-to-speech failed. "
+                f"HTTP={response.status_code} "
+                f"reason={response.reason_phrase} "
+                f"content_type={content_type} "
+                f"request_id={request_id} "
+                f"body={detail or '[empty]'} "
+                f"raw={raw_preview} "
+                f"voice={voice_name} "
+                f"region={region}"
             )
 
         base_path = (
