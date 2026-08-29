@@ -374,6 +374,7 @@ class WorkflowService:
         result = self.providers.media("voice").generate(
             text=text,
             project_id=p.id,
+            segments=segments,
         )
 
         actual = float(
