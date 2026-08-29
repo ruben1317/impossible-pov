@@ -72,7 +72,42 @@ class OpenAITextProvider(_OpenAIBase, TextProvider):
 
     def write_script(self, *, title: str, premise: str, research: dict[str, Any], config: dict[str, Any]):
         system = config.get("prompts", {}).get("script_system", "Write a POV short.")
-        user = f"Title: {title}\\nPremise: {premise}\\nResearch: {json.dumps(research)}\\nReturn JSON with hook, narration, segments (start,end,narration,visual), title, description, tags."
+        user = (
+            f"Title: {title}\n"
+            f"Premise: {premise}\n"
+            f"Research: {json.dumps(research)}\n\n"
+            "Create a cinematic POV short designed for approximately 30 seconds. "
+            "The narration must sound like the viewer is actually experiencing the event, "
+            "not like a documentary narrator.\n\n"
+            "Return JSON with: hook, narration, segments, title, description, tags.\n\n"
+            "Each segment must contain:\n"
+            "- start: segment start time\n"
+            "- end: segment end time\n"
+            "- narration: ONLY the words the narrator actually speaks\n"
+            "- visual: what should appear on screen\n"
+            "- delivery: acting direction such as tense, frightened, whispered, shocked, urgent, panicked, amazed, or calm\n"
+            "- pause_cues: a JSON list of intentional pauses inside the narration. "
+            "Each pause must contain after and ms. Example: "
+            "[{\"after\":\"You hear it\",\"ms\":450}]\n"
+            "- sfx: a JSON list of sound effects appropriate for that moment, "
+            "such as jungle ambience, distant roar, branch snap, heavy footsteps, heartbeat, breathing, impact, or silence\n\n"
+            "Use pauses for suspense and natural human reaction. Do not make every sentence continuous. "
+            "Use short fragments, hesitation, and silence when appropriate. "
+            "Sound effects should support the scene without overpowering the narration. "
+            "Do not write sound effects inside the narration text.\n\n"
+            "Example segment:\n"
+            "{"
+            "\"start\":0,"
+            "\"end\":5,"
+            "\"narration\":\"You open your eyes... and something feels wrong.\","
+            "\"visual\":\"First-person view waking on the floor of a prehistoric jungle.\","
+            "\"delivery\":\"tense, quiet, confused\","
+            "\"pause_cues\":["
+            "{\"after\":\"You open your eyes\",\"ms\":450}"
+            "],"
+            "\"sfx\":[\"dense jungle ambience\",\"distant low dinosaur call\"]"
+            "}"
+        )
         data, usage = self._json(system, user)
         # Economy default is six 5-second scenes / 30 seconds total.
         # Normalize model-provided timestamps so the UI and downstream scene timing
