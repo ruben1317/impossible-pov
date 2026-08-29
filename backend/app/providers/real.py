@@ -708,6 +708,7 @@ class GenericRealMediaProvider(MediaProvider):
         *,
         text: str,
         project_id: int,
+        segments: list | None = None,
     ):
         import os
 
