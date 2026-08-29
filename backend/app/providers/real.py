@@ -799,14 +799,89 @@ class GenericRealMediaProvider(MediaProvider):
                 f"Total voices={len(available_voices)}"
             )
 
-        escaped_text = (
-            text
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace('"', "&quot;")
-            .replace("'", "&apos;")
-        )
+        def escape_ssml(value: str) -> str:
+            return (
+                str(value)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&apos;")
+            )
+
+        narration_parts = []
+
+        for segment in (segments or []):
+            segment_text = str(
+                segment.get("narration", "")
+            ).strip()
+
+            if not segment_text:
+                continue
+
+            pause_cues = segment.get(
+                "pause_cues",
+                [],
+            ) or []
+
+            working_text = segment_text
+
+            for cue in pause_cues:
+                after = str(
+                    cue.get("after", "")
+                ).strip()
+
+                try:
+                    pause_ms = int(
+                        cue.get("ms", 350)
+                    )
+                except (TypeError, ValueError):
+                    pause_ms = 350
+
+                pause_ms = max(
+                    100,
+                    min(pause_ms, 1200),
+                )
+
+                if after and after in working_text:
+                    marker = (
+                        f"__PAUSE_{pause_ms}__"
+                    )
+
+                    working_text = working_text.replace(
+                        after,
+                        after + marker,
+                        1,
+                    )
+
+            escaped_segment = escape_ssml(
+                working_text
+            )
+
+            import re
+
+            escaped_segment = re.sub(
+                r"__PAUSE_(\d+)__",
+                lambda match: (
+                    "<break time='"
+                    + match.group(1)
+                    + "ms'/>"
+                ),
+                escaped_segment,
+            )
+
+            narration_parts.append(
+                escaped_segment
+            )
+
+        if narration_parts:
+            escaped_text = (
+                "<break time='180ms'/>".join(
+                    narration_parts
+                )
+            )
+        else:
+            escaped_text = escape_ssml(text)
 
         ssml = (
             "<speak version='1.0' "
